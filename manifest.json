@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Side Comments",
+  "version": "1.0",
+  "description": "View comments without scrolling past the video",
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["scripts/comments.js"],
+      "css": ["scripts/styles.css"]
+    }
+  ]
+}
