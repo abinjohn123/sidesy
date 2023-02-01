@@ -1,6 +1,12 @@
+.extension-control {
+  position: relative;
+}
+
 .popout {
   overflow-y: scroll;
+  width: 100%;
   padding: 0 16px;
+  margin-bottom: 24px;
   border-radius: 12px;
 }
 
@@ -14,4 +20,44 @@
 
 .light-mode {
   background-color: rgba(242, 242, 242, 255);
+}
+
+.comments-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.popout>.comments-header {
+  position: sticky;
+  z-index: 2;
+  top: 16px;
+}
+
+.comments-header-btn {
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.comments-header-btn:hover {
+  opacity: 1;
+}
+
+.comments-icon {
+  height: 28px;
+  transform: rotate(-45deg);
+}
+
+.stroke-light {
+  stroke: #fff;
+}
+
+.stroke-dark {
+  stroke: #0f0f0f;
 }
