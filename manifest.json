@@ -5,7 +5,7 @@
   "description": "View comments without scrolling past the video",
   "content_scripts": [
     {
-      "matches": ["https://www.youtube.com/*"],
+      "matches": ["https://www.youtube.com/watch*"],
       "js": ["scripts/comments.js"],
       "css": ["scripts/styles.css"]
     }
