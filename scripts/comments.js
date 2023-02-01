@@ -28,11 +28,15 @@ and attaching listeners to the comments section
 */
 
 function activateExtension() {
-  const commentsEl = document.getElementById('comments');
+  const commentsEl = document.querySelector('#comments');
+  const page = document.querySelector('html');
   const player = document.querySelector('.video-stream.html5-main-video');
   const sidebar = document.querySelector('#secondary');
 
-  commentsEl.classList.add('popout');
+  commentsEl.classList.add(
+    'popout',
+    page.hasAttribute('dark') ? 'dark-mode' : 'light-mode'
+  );
   commentsEl.style.width = `100%`;
   commentsEl.style.height = `${player.offsetHeight}px`;
   sidebar.prepend(commentsEl);
