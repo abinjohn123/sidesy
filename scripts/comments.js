@@ -69,14 +69,16 @@ function activateExtension() {
 
     originalCommentsContainer.append(commentsEl);
     commentsEl.style.display = 'block';
-    commentsEl.scrollIntoView({ behavior: 'smooth' });
   }
 
   function sidebarView() {
     commentsEl.classList.add('popout', isDark ? 'dark-mode' : 'light-mode');
     commentsEl.style.height = `${player.offsetHeight}px`;
     popButton.removeEventListener('click', sidebarView);
-    popButton.addEventListener('click', defaultView);
+    popButton.addEventListener('click', () => {
+      defaultView();
+      commentsEl.scrollIntoView({ behavior: 'smooth' });
+    });
 
     popButton.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
