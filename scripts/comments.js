@@ -6,27 +6,29 @@ The code below uses a mutation observer to listen to
 DOM changes and check if the comments have been
 loaded on the page.
 */
-const element = document.getElementById('content');
-const config = {
-  childList: true,
-  subtree: true,
-};
+chrome.runtime.onMessage.addListener((request, sender) => {
+  if (!request.activate) return;
 
-const callback = (mutationList, observer) => {
-  if (
-    mutationList.some((mutation) => {
-      // console.log(mutation.target.id);
-      return mutation.target.id === 'comments';
-    })
-  ) {
-    console.log('comments found');
-    activateExtension();
-    observer.disconnect();
-  }
-};
+  console.log(sender);
 
-const observer = new MutationObserver(callback);
-observer.observe(element, config);
+  console.log('hehehehehe');
+  const element = document.getElementById('content');
+  const config = {
+    childList: true,
+    subtree: true,
+  };
+
+  const callback = (mutationList, observer) => {
+    if (mutationList.some((mutation) => mutation.target.id === 'comments')) {
+      console.log('comments found');
+      activateExtension();
+      observer.disconnect();
+    }
+  };
+
+  const observer = new MutationObserver(callback);
+  observer.observe(element, config);
+});
 
 /*
 activates the extension by adding relevant classes
@@ -38,7 +40,7 @@ function activateExtension() {
   const page = document.querySelector('html');
   const player = document.querySelector('.video-stream.html5-main-video');
   const originalCommentsContainer = document.querySelector('#below');
-  const sidebar = document.querySelector('#secondary');
+  const sidebar = document.querySelector('#secondary-inner');
 
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
@@ -58,6 +60,7 @@ function activateExtension() {
     commentsEl.classList.remove('popout', 'dark-mode', 'light-mode');
     commentsEl.style.height = 'auto';
 
+    popButton.removeEventListener('click', defaultView);
     popButton.addEventListener('click', sidebarView);
 
     popButton.innerHTML = `
