@@ -6,13 +6,10 @@ The code below uses a mutation observer to listen to
 DOM changes and check if the comments have been
 loaded on the page.
 */
-chrome.runtime.onMessage.addListener((request, sender) => {
+chrome.runtime.onMessage.addListener((request) => {
   if (!request.activate) return;
 
-  console.log(sender);
-
-  console.log('hehehehehe');
-  const element = document.getElementById('content');
+  const trackedElement = document.getElementById('content');
   const config = {
     childList: true,
     subtree: true,
@@ -20,19 +17,19 @@ chrome.runtime.onMessage.addListener((request, sender) => {
 
   const callback = (mutationList, observer) => {
     if (mutationList.some((mutation) => mutation.target.id === 'comments')) {
-      console.log('comments found');
       activateExtension();
       observer.disconnect();
     }
   };
 
   const observer = new MutationObserver(callback);
-  observer.observe(element, config);
+  observer.observe(trackedElement, config);
 });
 
 /*
-activates the extension by adding relevant classes
-and attaching listeners to the comments section
+Gathers info from the page, like the theme and DOM Tree.
+A button is then added to the comments section to toggle between
+default view and sidebar view, and event listeners are attached.
 */
 
 function activateExtension() {
@@ -47,16 +44,6 @@ function activateExtension() {
 
   const popButton = document.createElement('button');
   popButton.classList.add('comments-header-btn');
-
-  if (!commentsEl.querySelector('header')) {
-    console.log('header created');
-    const header = document.createElement('header');
-    header.classList.add('comments-header');
-    header.append(popButton);
-    commentsEl.prepend(header);
-  }
-
-  defaultView();
 
   function defaultView() {
     commentsEl.style.display = 'none';
@@ -96,4 +83,13 @@ function activateExtension() {
     sidebar.prepend(commentsEl);
     page.scrollIntoView({ behavior: 'smooth' });
   }
+
+  if (!commentsEl.querySelector('header')) {
+    const header = document.createElement('header');
+    header.classList.add('comments-header');
+    header.append(popButton);
+    commentsEl.prepend(header);
+  }
+
+  defaultView();
 }
