@@ -48,10 +48,13 @@ function activateExtension() {
   const popButton = document.createElement('button');
   popButton.classList.add('comments-header-btn');
 
-  const header = document.createElement('header');
-  header.classList.add('comments-header');
-  header.append(popButton);
-  commentsEl.prepend(header);
+  if (!commentsEl.querySelector('header')) {
+    console.log('header created');
+    const header = document.createElement('header');
+    header.classList.add('comments-header');
+    header.append(popButton);
+    commentsEl.prepend(header);
+  }
 
   defaultView();
 
