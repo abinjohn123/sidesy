@@ -1,5 +1,3 @@
-console.log('script start');
-
 /* 
 Various sections of YouTube are loaded dynamically.
 The code below uses a mutation observer to listen to

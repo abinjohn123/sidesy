@@ -1,3 +1,20 @@
+.dark-mode {
+  background-color: rgba(24, 24, 24, 0.7);
+}
+
+.light-mode {
+  background-color: rgba(242, 242, 242, 255);
+}
+
+.stroke-light {
+  stroke: #fff;
+}
+
+.stroke-dark {
+  stroke: #0f0f0f;
+}
+
+
 .extension-control {
   position: relative;
 }
@@ -14,13 +31,6 @@
   display: none;
 }
 
-.dark-mode {
-  background-color: rgba(24, 24, 24, 0.7);
-}
-
-.light-mode {
-  background-color: rgba(242, 242, 242, 255);
-}
 
 .comments-header {
   position: absolute;
@@ -52,12 +62,4 @@
 .comments-icon {
   height: 28px;
   transform: rotate(-45deg);
-}
-
-.stroke-light {
-  stroke: #fff;
-}
-
-.stroke-dark {
-  stroke: #0f0f0f;
 }
