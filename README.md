@@ -1,6 +1,7 @@
 # Sidesy - Bring YouTube Comments To The Side
 
 A Google Chrome extension that brings the comments section to the sidebar, enabling users to dive into the comments without scrolling past the video
+![sidesy](images/name-card.png)
 
 ## Installation
 
