@@ -25,6 +25,44 @@ chrome.runtime.onMessage.addListener((request) => {
 });
 
 /*
+Goes through the comments, determines if the number of lines
+is more than 4, and displays the 'Read More' button
+to expand the comments.
+*/
+
+function expandComments(commentsEl) {
+  const commentTextContainer = commentsEl.querySelectorAll(
+    '#expander.style-scope.ytd-comment-renderer'
+  );
+  const lineHeight = Number.parseFloat(
+    getComputedStyle(commentTextContainer[0].querySelector('#content-text'))
+      .lineHeight
+  );
+
+  function showExpandButton(comment, shouldShow) {
+    const btnMore = comment.querySelector('#more');
+    const btnLess = comment.querySelector('#less');
+
+    if (!shouldShow) {
+      btnMore.setAttribute('hidden', '');
+      btnLess.setAttribute('hidden', '');
+      return;
+    }
+
+    btnLess.setAttribute('hidden', '');
+    btnMore.removeAttribute('hidden');
+  }
+
+  commentTextContainer.forEach((comment) => {
+    comment.querySelector('#content').offsetHeight;
+    const textContainerHeight =
+      comment.querySelector('#content-text').offsetHeight;
+    const lines = Math.ceil(textContainerHeight / lineHeight);
+    showExpandButton(comment, lines > 4);
+  });
+}
+
+/*
 Gathers info from the page, like the theme and DOM Tree.
 A button is then added to the comments section to toggle between
 default view and sidebar view, and event listeners are attached.
@@ -68,6 +106,7 @@ function activateExtension() {
     popButton.removeEventListener('click', sidebarView);
     popButton.addEventListener('click', () => {
       defaultView();
+      expandComments(commentsEl);
       commentsEl.scrollIntoView({ behavior: 'smooth' });
     });
 
@@ -79,6 +118,7 @@ function activateExtension() {
     </svg>`;
 
     sidebar.prepend(commentsEl);
+    expandComments(commentsEl);
     page.scrollIntoView({ behavior: 'smooth' });
   }
 
@@ -90,4 +130,30 @@ function activateExtension() {
   }
 
   defaultView();
+
+  // Click event listener to handle the 'Read More' and 'Show Less' button clicks.
+  function handleExpandButtonClick(e) {
+    if (
+      !e.target.classList.contains('more-button') &&
+      !e.target.classList.contains('less-button')
+    )
+      return;
+
+    const commentContainer = e.target.closest(
+      '#expander.style-scope.ytd-comment-renderer'
+    );
+    const btnMore = commentContainer.querySelector('#more');
+    const btnLess = commentContainer.querySelector('#less');
+
+    if (e.target.classList.contains('more-button')) {
+      btnMore.setAttribute('hidden', '');
+      btnLess.removeAttribute('hidden');
+      commentContainer.removeAttribute('collapsed');
+    } else {
+      btnMore.removeAttribute('hidden');
+      btnLess.setAttribute('hidden', '');
+      commentContainer.setAttribute('collapsed', '');
+    }
+  }
+  commentsEl.addEventListener('click', handleExpandButtonClick);
 }
