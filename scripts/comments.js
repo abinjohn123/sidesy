@@ -108,7 +108,9 @@ function activateExtension() {
       videoSizeButton.click();
     }
     commentsEl.classList.add('popout', isDark ? 'dark-mode' : 'light-mode');
-    commentsEl.style.height = `${player.offsetHeight}px`;
+    setTimeout(() => {
+      commentsEl.style.height = `${player.offsetHeight}px`;
+    }, 0);
     popButton.removeEventListener('click', sidebarView);
     popButton.addEventListener('click', () => {
       defaultView();
