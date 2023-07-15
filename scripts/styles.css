@@ -20,6 +20,7 @@
 }
 
 .popout {
+  box-sizing: border-box;
   overflow-y: scroll;
   width: 100%;
   padding: 0 16px;
