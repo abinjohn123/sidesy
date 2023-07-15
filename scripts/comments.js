@@ -72,9 +72,7 @@ Save current extension position locally
 */
 
 function savePosition(position) {
-  chrome.storage.local.set({ comments_placement: position }).then(() => {
-    console.log(`${position} is set`);
-  });
+  chrome.storage.local.set({ comments_placement: position });
 }
 
 /*
