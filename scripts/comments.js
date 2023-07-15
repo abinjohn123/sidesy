@@ -1,3 +1,18 @@
+import {
+  MUTATION_TARGET_ID,
+  MUTATION_TRACKED_ID,
+  COMMENTS_ELEMENT,
+  COMMENTS_TEXT_CONTAINER,
+  BTN_READ_MORE,
+  BTN_SHOW_LESS,
+  PAGE,
+  PLAYER,
+  DEFAULT_CONTAINER,
+  SIDEBAR_CONTAINER,
+  THEATRE_MODE_TOGGLE,
+  DARK_MODE_ATTRIBUTE,
+} from './constants.js';
+
 /* 
 Various sections of YouTube are loaded dynamically.
 The code below uses a mutation observer to listen to
@@ -7,14 +22,16 @@ loaded on the page.
 chrome.runtime.onMessage.addListener((request) => {
   if (!request.activate) return;
 
-  const trackedElement = document.getElementById('content');
+  const trackedElement = document.querySelector(MUTATION_TRACKED_ID);
   const config = {
     childList: true,
     subtree: true,
   };
 
   const callback = (mutationList, observer) => {
-    if (mutationList.some((mutation) => mutation.target.id === 'comments')) {
+    if (
+      mutationList.some((mutation) => mutation.target.id === MUTATION_TARGET_ID)
+    ) {
       activateExtension();
       observer.disconnect();
     }
@@ -32,7 +49,7 @@ to expand the comments.
 
 function expandComments(commentsEl) {
   const commentTextContainer = commentsEl.querySelectorAll(
-    '#expander.style-scope.ytd-comment-renderer'
+    COMMENTS_TEXT_CONTAINER
   );
   const lineHeight = Number.parseFloat(
     getComputedStyle(commentTextContainer[0].querySelector('#content-text'))
@@ -69,16 +86,18 @@ default view and sidebar view, and event listeners are attached.
 */
 
 function activateExtension() {
-  const commentsEl = document.querySelector('#comments');
-  const page = document.querySelector('html');
-  const player = document.querySelector('.video-stream.html5-main-video');
-  const originalCommentsContainer = document.querySelector('#below');
-  const sidebar = document.querySelector('#secondary-inner');
-  const videoSizeButton = document.querySelector('.ytp-size-button');
+  const commentsEl = document.querySelector(COMMENTS_ELEMENT);
+  const page = document.querySelector(PAGE);
+  const player = document.querySelector(PLAYER);
+  const originalCommentsContainer = document.querySelector(DEFAULT_CONTAINER);
+  const sidebar = document.querySelector(SIDEBAR_CONTAINER);
+  const videoSizeButton = document.querySelector(THEATRE_MODE_TOGGLE);
 
-  let boolTheaterMode = videoSizeButton.getAttribute('data-title-no-tooltip').includes('Default');
+  let boolTheaterMode = videoSizeButton
+    .getAttribute('data-title-no-tooltip')
+    .includes('Default');
 
-  const isDark = page.hasAttribute('dark');
+  const isDark = page.hasAttribute(DARK_MODE_ATTRIBUTE);
   commentsEl.classList.add('extension-control');
 
   const popButton = document.createElement('button');
@@ -147,11 +166,9 @@ function activateExtension() {
     )
       return;
 
-    const commentContainer = e.target.closest(
-      '#expander.style-scope.ytd-comment-renderer'
-    );
-    const btnMore = commentContainer.querySelector('#more');
-    const btnLess = commentContainer.querySelector('#less');
+    const commentContainer = e.target.closest(COMMENTS_TEXT_CONTAINER);
+    const btnMore = commentContainer.querySelector(BTN_READ_MORE);
+    const btnLess = commentContainer.querySelector(BTN_SHOW_LESS);
 
     if (e.target.classList.contains('more-button')) {
       btnMore.setAttribute('hidden', '');
