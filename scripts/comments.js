@@ -74,6 +74,9 @@ function activateExtension() {
   const player = document.querySelector('.video-stream.html5-main-video');
   const originalCommentsContainer = document.querySelector('#below');
   const sidebar = document.querySelector('#secondary-inner');
+  const videoSizeButton = document.querySelector('.ytp-size-button');
+
+  let boolTheaterMode = videoSizeButton.getAttribute('data-title-no-tooltip').includes('Default');
 
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
@@ -101,8 +104,13 @@ function activateExtension() {
   }
 
   function sidebarView() {
+    if (boolTheaterMode) {
+      videoSizeButton.click();
+    }
     commentsEl.classList.add('popout', isDark ? 'dark-mode' : 'light-mode');
-    commentsEl.style.height = `${player.offsetHeight}px`;
+    setTimeout(() => {
+      commentsEl.style.height = `${player.offsetHeight}px`;
+    }, 0);
     popButton.removeEventListener('click', sidebarView);
     popButton.addEventListener('click', () => {
       defaultView();
@@ -155,5 +163,12 @@ function activateExtension() {
       commentContainer.setAttribute('collapsed', '');
     }
   }
+  videoSizeButton.addEventListener('click', () => {
+    boolTheaterMode = !boolTheaterMode;
+
+    if (boolTheaterMode) {
+      defaultView();
+    }
+  });
   commentsEl.addEventListener('click', handleExpandButtonClick);
 }
