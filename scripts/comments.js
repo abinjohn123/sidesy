@@ -34,10 +34,15 @@ function expandComments(commentsEl) {
   const commentTextContainer = commentsEl.querySelectorAll(
     '#expander.style-scope.ytd-comment-renderer'
   );
-  const lineHeight = Number.parseFloat(
-    getComputedStyle(commentTextContainer[0].querySelector('#content-text'))
-      .lineHeight
-  );
+
+  const lineHeight =
+    commentTextContainer.length > 0
+      ? Number.parseFloat(
+          getComputedStyle(
+            commentTextContainer[0].querySelector('#content-text')
+          ).lineHeight
+        )
+      : 20;
 
   function showExpandButton(comment, shouldShow) {
     const btnMore = comment.querySelector('#more');
