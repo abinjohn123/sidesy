@@ -63,6 +63,16 @@ function expandComments(commentsEl) {
 }
 
 /*
+Save current extension position locally
+*/
+
+function savePosition(position) {
+  chrome.storage.local.set({ comments_placement: position }).then(() => {
+    console.log(`${position} is set`);
+  });
+}
+
+/*
 Gathers info from the page, like the theme and DOM Tree.
 A button is then added to the comments section to toggle between
 default view and sidebar view, and event listeners are attached.
@@ -76,7 +86,9 @@ function activateExtension() {
   const sidebar = document.querySelector('#secondary-inner');
   const videoSizeButton = document.querySelector('.ytp-size-button');
 
-  let boolTheaterMode = videoSizeButton.getAttribute('data-title-no-tooltip').includes('Default');
+  let boolTheaterMode = videoSizeButton
+    .getAttribute('data-title-no-tooltip')
+    .includes('Default');
 
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
@@ -101,6 +113,8 @@ function activateExtension() {
 
     originalCommentsContainer.append(commentsEl);
     commentsEl.style.display = 'block';
+
+    savePosition('default');
   }
 
   function sidebarView() {
@@ -128,6 +142,8 @@ function activateExtension() {
     sidebar.prepend(commentsEl);
     expandComments(commentsEl);
     page.scrollIntoView({ behavior: 'smooth' });
+
+    savePosition('sidebar');
   }
 
   if (!commentsEl.querySelector('header')) {
@@ -136,8 +152,6 @@ function activateExtension() {
     header.append(popButton);
     commentsEl.prepend(header);
   }
-
-  defaultView();
 
   // Click event listener to handle the 'Read More' and 'Show Less' button clicks.
   function handleExpandButtonClick(e) {
@@ -163,6 +177,7 @@ function activateExtension() {
       commentContainer.setAttribute('collapsed', '');
     }
   }
+
   videoSizeButton.addEventListener('click', () => {
     boolTheaterMode = !boolTheaterMode;
 
@@ -171,4 +186,9 @@ function activateExtension() {
     }
   });
   commentsEl.addEventListener('click', handleExpandButtonClick);
+
+  chrome.storage.local.get(['comments_placement']).then((data) => {
+    if (data.comments_placement === 'sidebar') sidebarView();
+    else defaultView();
+  });
 }
