@@ -29,7 +29,17 @@
 }
 
 .popout::-webkit-scrollbar {
-  display: none;
+  /* display: none; */
+  width: 8px;
+}
+
+.popout::-webkit-scrollbar-track {
+  background: none;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #aaa;
+  border-radius: 4px;
 }
 
 
