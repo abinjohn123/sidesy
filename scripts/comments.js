@@ -87,9 +87,11 @@ function activateExtension() {
   const player = document.querySelector('.video-stream.html5-main-video');
   const originalCommentsContainer = document.querySelector('#below');
   const sidebar = document.querySelector('#secondary-inner');
-  const videoSizeButton = document.querySelector('.ytp-size-button');
+  const viewModeToggleBtn = document.querySelector(
+    '.ytp-size-button.ytp-button'
+  );
 
-  let boolTheaterMode = videoSizeButton
+  let boolTheaterMode = viewModeToggleBtn
     .getAttribute('data-title-no-tooltip')
     .includes('Default');
 
@@ -122,7 +124,7 @@ function activateExtension() {
 
   function sidebarView() {
     if (boolTheaterMode) {
-      videoSizeButton.click();
+      viewModeToggleBtn.click();
     }
     commentsEl.classList.add('popout', isDark ? 'dark-mode' : 'light-mode');
     setTimeout(() => {
@@ -181,7 +183,7 @@ function activateExtension() {
     }
   }
 
-  videoSizeButton.addEventListener('click', () => {
+  viewModeToggleBtn.addEventListener('click', () => {
     boolTheaterMode = !boolTheaterMode;
 
     if (boolTheaterMode) {
