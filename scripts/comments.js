@@ -87,6 +87,7 @@ function activateExtension() {
   const player = document.querySelector('.video-stream.html5-main-video');
   const originalCommentsContainer = document.querySelector('#below');
   const sidebar = document.querySelector('#secondary-inner');
+  const videoPlayerContainer = document.querySelector('#movie_player');
   const viewModeToggleBtn = document.querySelector(
     '.ytp-size-button.ytp-button'
   );
@@ -151,6 +152,35 @@ function activateExtension() {
     savePosition('sidebar');
   }
 
+  function theatreModeView() {
+    commentsEl.classList.add(
+      'popout',
+      'theatre-mode',
+      isDark ? 'dark-mode' : 'light-mode'
+    );
+    commentsEl.style.width = `${sidebar.offsetWidth}px`;
+    commentsEl.style.height = '';
+    commentsEl.style.maxHeight = `${player.offsetHeight}px`;
+
+    popButton.removeEventListener('click', sidebarView);
+
+    popButton.addEventListener('click', () => {
+      defaultView();
+      expandComments(commentsEl);
+      commentsEl.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    popButton.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
+      isDark ? 'stroke-light' : 'stroke-dark'
+    }">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 9l-3 3m0 0l3 3m-3-3h7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"" />
+    </svg>`;
+
+    videoPlayerContainer.append(commentsEl);
+    expandComments(commentsEl);
+  }
+
   // Click event listener to handle the 'Read More' and 'Show Less' button clicks.
   function handleExpandButtonClick(e) {
     if (
@@ -181,7 +211,7 @@ function activateExtension() {
     boolTheaterMode = !boolTheaterMode;
 
     if (boolTheaterMode) {
-      defaultView();
+      theatreModeView();
     }
   });
 

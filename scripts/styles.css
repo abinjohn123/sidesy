@@ -28,6 +28,26 @@
   border-radius: 12px;
 }
 
+.popout.theatre-mode {
+  position: absolute;
+  top: 10%;
+  right: 10%;
+
+  max-height: 100px !important;
+  overflow-y: hidden;
+
+  /* transform: translateY(-50%); */
+  opacity: 0.8;
+  z-index: 20;
+  transition: opacity 0.2s, max-height 0.2s;
+}
+
+.popout.theatre-mode:hover {
+  opacity: 1;
+  overflow-y: auto;
+  max-height: 720px !important;
+}
+
 .popout::-webkit-scrollbar {
   /* display: none; */
   width: 8px;
