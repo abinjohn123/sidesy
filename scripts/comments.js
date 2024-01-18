@@ -151,13 +151,6 @@ function activateExtension() {
     savePosition('sidebar');
   }
 
-  if (!commentsEl.querySelector('header')) {
-    const header = document.createElement('header');
-    header.classList.add('comments-header');
-    header.append(popButton);
-    commentsEl.prepend(header);
-  }
-
   // Click event listener to handle the 'Read More' and 'Show Less' button clicks.
   function handleExpandButtonClick(e) {
     if (
@@ -182,6 +175,7 @@ function activateExtension() {
       commentContainer.setAttribute('collapsed', '');
     }
   }
+  commentsEl.addEventListener('click', handleExpandButtonClick);
 
   viewModeToggleBtn.addEventListener('click', () => {
     boolTheaterMode = !boolTheaterMode;
@@ -190,7 +184,14 @@ function activateExtension() {
       defaultView();
     }
   });
-  commentsEl.addEventListener('click', handleExpandButtonClick);
+
+  // init
+  if (!commentsEl.querySelector('header')) {
+    const header = document.createElement('header');
+    header.classList.add('comments-header');
+    header.append(popButton);
+    commentsEl.prepend(header);
+  }
 
   chrome.storage.local.get(['comments_placement']).then((data) => {
     if (data.comments_placement === 'sidebar') sidebarView();
