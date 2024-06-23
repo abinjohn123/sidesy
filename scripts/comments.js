@@ -32,7 +32,7 @@ to expand the comments.
 
 function expandComments(commentsEl) {
   const commentTextContainer = commentsEl.querySelectorAll(
-    '#expander.style-scope.ytd-comment-renderer'
+    '#expander.style-scope.ytd-comment-view-model'
   );
 
   const lineHeight =
@@ -165,7 +165,7 @@ function activateExtension() {
       return;
 
     const commentContainer = e.target.closest(
-      '#expander.style-scope.ytd-comment-renderer'
+      '#expander.style-scope.ytd-comment-view-model'
     );
     const btnMore = commentContainer.querySelector('#more');
     const btnLess = commentContainer.querySelector('#less');
