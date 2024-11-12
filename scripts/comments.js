@@ -12,7 +12,7 @@ chrome.runtime.onMessage.addListener((request) => {
 
     // below is an "if" statement to retry "initObserver function" if "trackedElement" is not found or loaded yet
     if (!trackedElement){
-      setTimeout(initObserver);
+      setTimeout(initObserver,0);
       return;
     }
     
