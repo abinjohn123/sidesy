@@ -7,21 +7,31 @@ loaded on the page.
 chrome.runtime.onMessage.addListener((request) => {
   if (!request.activate) return;
 
-  const trackedElement = document.getElementById('content');
-  const config = {
-    childList: true,
-    subtree: true,
-  };
+  function initObserver(){ //wrap into function
+    const trackedElement = document.getElementById('content');
 
-  const callback = (mutationList, observer) => {
-    if (mutationList.some((mutation) => mutation.target.id === 'comments')) {
-      activateExtension();
-      observer.disconnect();
+    // below is an "if" statement to retry "initObserver function" if "trackedElement" is not found or loaded yet
+    if (!trackedElement){
+      setTimeout(initObserver);
+      return;
     }
-  };
-
-  const observer = new MutationObserver(callback);
-  observer.observe(trackedElement, config);
+    
+    const config = {
+      childList: true,
+      subtree: true,
+    };
+  
+    const callback = (mutationList, observer) => {
+      if (mutationList.some((mutation) => mutation.target.id === 'comments')) {
+        activateExtension();
+        observer.disconnect();
+      }
+    };
+  
+    const observer = new MutationObserver(callback);
+    observer.observe(trackedElement, config);
+  }
+  initObserver(); // start initialization
 });
 
 /*
