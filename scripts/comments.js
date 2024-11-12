@@ -109,6 +109,8 @@ function activateExtension() {
   const popButton = document.createElement('button');
   popButton.classList.add('comments-header-btn');
 
+  sidebarView(); //calling "sidebarView" function right away so that comment-section loads as a sidebar and not a bottom comment-section from the start
+  
   function defaultView() {
     commentsEl.style.display = 'none';
     commentsEl.classList.remove('popout', 'dark-mode', 'light-mode');
