@@ -191,7 +191,7 @@ function activateExtension() {
   commentsEl.addEventListener('click', handleExpandButtonClick);
 
   chrome.storage.local.get(['comments_placement']).then((data) => {
-    if (data.comments_placement === 'sidebar') sidebarView();
-    else defaultView();
+    if (data.comments_placement === 'default') defaultView();
+    else sidebarView();
   });
 }
