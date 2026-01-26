@@ -1,20 +1,48 @@
-/* 
+/*
 Various sections of YouTube are loaded dynamically.
 The code below uses a mutation observer to listen to
 DOM changes and check if the comments have been
 loaded on the page.
 */
+
+// Track if extension has been activated to prevent duplicate initialization
+let isActivated = false;
+
 chrome.runtime.onMessage.addListener((request) => {
   if (!request.activate) return;
 
+  // Reset activation state for new page/navigation
+  isActivated = false;
+
+  // Check if comments section already exists (fixes race condition where
+  // comments load before the observer is set up)
+  const existingComments = document.querySelector('#comments');
+  if (existingComments && !isActivated) {
+    isActivated = true;
+    activateExtension();
+    return;
+  }
+
   const trackedElement = document.getElementById('content');
+  if (!trackedElement) return;
+
   const config = {
     childList: true,
     subtree: true,
   };
 
   const callback = (mutationList, observer) => {
-    if (mutationList.some((mutation) => mutation.target.id === 'comments')) {
+    // Don't activate twice
+    if (isActivated) {
+      observer.disconnect();
+      return;
+    }
+
+    // Check if comments element now exists in the DOM (more reliable than
+    // checking mutation targets, which may not match if children are mutated)
+    const commentsEl = document.querySelector('#comments');
+    if (commentsEl) {
+      isActivated = true;
       activateExtension();
       observer.disconnect();
     }
@@ -89,9 +117,21 @@ function activateExtension() {
   const sidebar = document.querySelector('#secondary-inner');
   const videoSizeButton = document.querySelector('.ytp-size-button');
 
+  // Guard: ensure all required elements exist before proceeding
+  if (!commentsEl || !player || !originalCommentsContainer || !sidebar || !videoSizeButton) {
+    // Reset activation flag so we can retry on next mutation/message
+    isActivated = false;
+    return;
+  }
+
+  // Skip if we already added the header (prevents duplicate buttons)
+  if (commentsEl.querySelector('.comments-header')) {
+    return;
+  }
+
   let boolTheaterMode = videoSizeButton
     .getAttribute('data-title-no-tooltip')
-    .includes('Default');
+    ?.includes('Default') ?? false;
 
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
@@ -149,12 +189,11 @@ function activateExtension() {
     savePosition('sidebar');
   }
 
-  if (!commentsEl.querySelector('header')) {
-    const header = document.createElement('header');
-    header.classList.add('comments-header');
-    header.append(popButton);
-    commentsEl.prepend(header);
-  }
+  // Create and append the header with toggle button
+  const header = document.createElement('header');
+  header.classList.add('comments-header');
+  header.append(popButton);
+  commentsEl.prepend(header);
 
   // Click event listener to handle the 'Read More' and 'Show Less' button clicks.
   function handleExpandButtonClick(e) {
