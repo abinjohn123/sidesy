@@ -1,5 +1,3 @@
-importScripts("constants.js");
-
 /**
  * Redirection to Welcome Page
  * after extension has been installed.
