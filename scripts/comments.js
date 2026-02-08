@@ -1,97 +1,118 @@
-/* 
-Various sections of YouTube are loaded dynamically.
-The code below uses a mutation observer to listen to
-DOM changes and check if the comments have been
-loaded on the page.
+/*
+YouTube is a Single Page Application (SPA). Instead of relying on
+messages from the background script (which causes race conditions),
+we listen for YouTube's own `yt-navigate-finish` event to detect
+page navigation and then watch for comments to become ready.
 */
-// Track if we're already initialized to prevent multiple activations
-let extensionInitialized = false;
 
-chrome.runtime.onMessage.addListener((request) => {
-  if (!request.activate) return;
+// State for the current navigation
+let currentObserver = null;
+let currentInterval = null;
+let activated = false;
 
-  console.log('[Sidesy] Activation message received');
-
-  // Prevent multiple initialization attempts
-  if (extensionInitialized) {
-    console.log('[Sidesy] Already initialized, ignoring duplicate activation message');
-    return;
+function cleanup() {
+  if (currentObserver) {
+    currentObserver.disconnect();
+    currentObserver = null;
   }
-  extensionInitialized = true;
+  if (currentInterval) {
+    clearInterval(currentInterval);
+    currentInterval = null;
+  }
+  activated = false;
+}
 
-  let activationAttempted = false;
+function areCommentsReady() {
+  const comments = document.getElementById('comments');
+  return comments &&
+         !comments.hasAttribute('hidden') &&
+         comments.innerHTML.length > 100;
+}
 
-  // Helper function to check if comments are ready
-  function areCommentsReady() {
-    const comments = document.getElementById('comments');
-    console.log('[Sidesy] Checking comments:', comments);
-    if (comments) {
-      console.log('[Sidesy] Has hidden attribute:', comments.hasAttribute('hidden'));
-      console.log('[Sidesy] Comments children:', comments.children.length);
-      console.log('[Sidesy] Comments innerHTML length:', comments.innerHTML.length);
+function tryActivate() {
+  if (activated) return true;
+  if (areCommentsReady()) {
+    activated = true;
+    activateExtension();
+    // Clean up detection mechanisms since we've activated
+    if (currentObserver) {
+      currentObserver.disconnect();
+      currentObserver = null;
     }
-    // Check if comments exist, are not hidden, and have content
-    return comments &&
-           !comments.hasAttribute('hidden') &&
-           comments.innerHTML.length > 100;
-  }
-
-  // Try to activate extension
-  function tryActivate() {
-    if (activationAttempted) return true; // Already activated
-    if (areCommentsReady()) {
-      console.log('[Sidesy] Activating extension');
-      activationAttempted = true;
-      activateExtension();
-      return true;
+    if (currentInterval) {
+      clearInterval(currentInterval);
+      currentInterval = null;
     }
-    return false;
+    return true;
   }
+  return false;
+}
 
-  // Check if comments already exist and are loaded
-  if (tryActivate()) {
-    return;
-  }
+function detectComments() {
+  // Already ready? Activate immediately
+  if (tryActivate()) return;
 
-  // Otherwise, wait for comments to load
-  const trackedElement = document.getElementById('content');
-  console.log('[Sidesy] Setting up observer on:', trackedElement);
+  const comments = document.getElementById('comments');
 
-  let observer = null; // Declare observer outside so it's accessible in cleanup
-
-  // Only set up observer if we have an element to observe
-  if (trackedElement) {
-    const config = {
-      childList: true,
-      subtree: true,
-    };
-
-    const callback = (mutationList, observer) => {
-      console.log('[Sidesy] Mutation detected, mutations count:', mutationList.length);
-
-      if (tryActivate()) {
-        console.log('[Sidesy] Successfully activated, disconnecting observer');
-        observer.disconnect();
+  // Tier 1: If #comments exists with hidden attribute, observe for unhide
+  if (comments && comments.hasAttribute('hidden')) {
+    currentObserver = new MutationObserver(() => {
+      if (!comments.hasAttribute('hidden')) {
+        currentObserver.disconnect();
+        currentObserver = null;
+        // Content may not be loaded yet — fall through to periodic check
+        if (!tryActivate()) {
+          startPeriodicCheck();
+        }
       }
-    };
-
-    observer = new MutationObserver(callback);
-    observer.observe(trackedElement, config);
-  } else {
-    console.log('[Sidesy] #content element not found, relying on periodic checks');
+    });
+    currentObserver.observe(comments, { attributes: true, attributeFilter: ['hidden'] });
   }
 
-  // Failsafe: check periodically for up to 10 seconds
+  // Tier 2: Periodic fallback check
+  startPeriodicCheck();
+}
+
+function startPeriodicCheck() {
+  // Don't start a second interval if one is already running
+  if (currentInterval) return;
+
   let attempts = 0;
-  const interval = setInterval(() => {
+  const maxAttempts = 60; // 30 seconds at 500ms intervals
+
+  currentInterval = setInterval(() => {
     attempts++;
-    console.log('[Sidesy] Periodic check attempt:', attempts);
-    if (tryActivate() || attempts >= 20) {
-      clearInterval(interval);
-      if (observer) observer.disconnect(); // Only disconnect if observer exists
+    if (tryActivate() || attempts >= maxAttempts) {
+      clearInterval(currentInterval);
+      currentInterval = null;
     }
   }, 500);
-});
+}
+
+function onNavigate() {
+  const isWatchPage = location.href.includes('youtube.com/watch');
+
+  cleanup();
+
+  if (!isWatchPage) return;
+
+  detectComments();
+}
+
+// YouTube fires this event when SPA navigation completes
+document.addEventListener('yt-navigate-finish', onNavigate);
+
+// Also handle the initial page load (e.g. direct URL paste or refresh)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (location.href.includes('youtube.com/watch')) {
+      cleanup();
+      detectComments();
+    }
+  });
+} else if (location.href.includes('youtube.com/watch')) {
+  detectComments();
+}
 
 /*
 Goes through the comments, determines if the number of lines
