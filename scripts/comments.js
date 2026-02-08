@@ -4,24 +4,93 @@ The code below uses a mutation observer to listen to
 DOM changes and check if the comments have been
 loaded on the page.
 */
+// Track if we're already initialized to prevent multiple activations
+let extensionInitialized = false;
+
 chrome.runtime.onMessage.addListener((request) => {
   if (!request.activate) return;
 
-  const trackedElement = document.getElementById('content');
-  const config = {
-    childList: true,
-    subtree: true,
-  };
+  console.log('[Sidesy] Activation message received');
 
-  const callback = (mutationList, observer) => {
-    if (mutationList.some((mutation) => mutation.target.id === 'comments')) {
-      activateExtension();
-      observer.disconnect();
+  // Prevent multiple initialization attempts
+  if (extensionInitialized) {
+    console.log('[Sidesy] Already initialized, ignoring duplicate activation message');
+    return;
+  }
+  extensionInitialized = true;
+
+  let activationAttempted = false;
+
+  // Helper function to check if comments are ready
+  function areCommentsReady() {
+    const comments = document.getElementById('comments');
+    console.log('[Sidesy] Checking comments:', comments);
+    if (comments) {
+      console.log('[Sidesy] Has hidden attribute:', comments.hasAttribute('hidden'));
+      console.log('[Sidesy] Comments children:', comments.children.length);
+      console.log('[Sidesy] Comments innerHTML length:', comments.innerHTML.length);
     }
-  };
+    // Check if comments exist, are not hidden, and have content
+    return comments &&
+           !comments.hasAttribute('hidden') &&
+           comments.innerHTML.length > 100;
+  }
 
-  const observer = new MutationObserver(callback);
-  observer.observe(trackedElement, config);
+  // Try to activate extension
+  function tryActivate() {
+    if (activationAttempted) return true; // Already activated
+    if (areCommentsReady()) {
+      console.log('[Sidesy] Activating extension');
+      activationAttempted = true;
+      activateExtension();
+      return true;
+    }
+    return false;
+  }
+
+  // Check if comments already exist and are loaded
+  if (tryActivate()) {
+    return;
+  }
+
+  // Otherwise, wait for comments to load
+  const trackedElement = document.getElementById('content');
+  console.log('[Sidesy] Setting up observer on:', trackedElement);
+
+  let observer = null; // Declare observer outside so it's accessible in cleanup
+
+  // Only set up observer if we have an element to observe
+  if (trackedElement) {
+    const config = {
+      childList: true,
+      subtree: true,
+    };
+
+    const callback = (mutationList, observer) => {
+      console.log('[Sidesy] Mutation detected, mutations count:', mutationList.length);
+
+      if (tryActivate()) {
+        console.log('[Sidesy] Successfully activated, disconnecting observer');
+        observer.disconnect();
+      }
+    };
+
+    observer = new MutationObserver(callback);
+    observer.observe(trackedElement, config);
+  } else {
+    console.log('[Sidesy] #content element not found, relying on periodic checks');
+  }
+
+  // Failsafe: check periodically for up to 10 seconds
+  let attempts = 0;
+  const interval = setInterval(() => {
+    attempts++;
+    console.log('[Sidesy] Periodic check attempt:', attempts);
+    if (tryActivate() || attempts >= 20) {
+      clearInterval(interval);
+      if (observer) observer.disconnect(); // Only disconnect if observer exists
+    }
+  }, 500);
 });
 
 /*
