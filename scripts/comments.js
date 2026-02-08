@@ -1,28 +1,118 @@
-/* 
-Various sections of YouTube are loaded dynamically.
-The code below uses a mutation observer to listen to
-DOM changes and check if the comments have been
-loaded on the page.
+/*
+YouTube is a Single Page Application (SPA). Instead of relying on
+messages from the background script (which causes race conditions),
+we listen for YouTube's own `yt-navigate-finish` event to detect
+page navigation and then watch for comments to become ready.
 */
-chrome.runtime.onMessage.addListener((request) => {
-  if (!request.activate) return;
 
-  const trackedElement = document.getElementById('content');
-  const config = {
-    childList: true,
-    subtree: true,
-  };
+// State for the current navigation
+let currentObserver = null;
+let currentInterval = null;
+let activated = false;
 
-  const callback = (mutationList, observer) => {
-    if (mutationList.some((mutation) => mutation.target.id === 'comments')) {
-      activateExtension();
-      observer.disconnect();
+function cleanup() {
+  if (currentObserver) {
+    currentObserver.disconnect();
+    currentObserver = null;
+  }
+  if (currentInterval) {
+    clearInterval(currentInterval);
+    currentInterval = null;
+  }
+  activated = false;
+}
+
+function areCommentsReady() {
+  const comments = document.getElementById('comments');
+  return comments &&
+         !comments.hasAttribute('hidden') &&
+         comments.innerHTML.length > 100;
+}
+
+function tryActivate() {
+  if (activated) return true;
+  if (areCommentsReady()) {
+    activated = true;
+    activateExtension();
+    // Clean up detection mechanisms since we've activated
+    if (currentObserver) {
+      currentObserver.disconnect();
+      currentObserver = null;
     }
-  };
+    if (currentInterval) {
+      clearInterval(currentInterval);
+      currentInterval = null;
+    }
+    return true;
+  }
+  return false;
+}
 
-  const observer = new MutationObserver(callback);
-  observer.observe(trackedElement, config);
-});
+function detectComments() {
+  // Already ready? Activate immediately
+  if (tryActivate()) return;
+
+  const comments = document.getElementById('comments');
+
+  // Tier 1: If #comments exists with hidden attribute, observe for unhide
+  if (comments && comments.hasAttribute('hidden')) {
+    currentObserver = new MutationObserver(() => {
+      if (!comments.hasAttribute('hidden')) {
+        currentObserver.disconnect();
+        currentObserver = null;
+        // Content may not be loaded yet — fall through to periodic check
+        if (!tryActivate()) {
+          startPeriodicCheck();
+        }
+      }
+    });
+    currentObserver.observe(comments, { attributes: true, attributeFilter: ['hidden'] });
+  }
+
+  // Tier 2: Periodic fallback check
+  startPeriodicCheck();
+}
+
+function startPeriodicCheck() {
+  // Don't start a second interval if one is already running
+  if (currentInterval) return;
+
+  let attempts = 0;
+  const maxAttempts = 60; // 30 seconds at 500ms intervals
+
+  currentInterval = setInterval(() => {
+    attempts++;
+    if (tryActivate() || attempts >= maxAttempts) {
+      clearInterval(currentInterval);
+      currentInterval = null;
+    }
+  }, 500);
+}
+
+function onNavigate() {
+  const isWatchPage = location.href.includes('youtube.com/watch');
+
+  cleanup();
+
+  if (!isWatchPage) return;
+
+  detectComments();
+}
+
+// YouTube fires this event when SPA navigation completes
+document.addEventListener('yt-navigate-finish', onNavigate);
+
+// Also handle the initial page load (e.g. direct URL paste or refresh)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (location.href.includes('youtube.com/watch')) {
+      cleanup();
+      detectComments();
+    }
+  });
+} else if (location.href.includes('youtube.com/watch')) {
+  detectComments();
+}
 
 /*
 Goes through the comments, determines if the number of lines
