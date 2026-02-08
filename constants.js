@@ -3,7 +3,7 @@ const CONSTANTS = {
   POPUP_LINKS: [
     {
       label: "See Sidesy in action",
-      description: "A quick, 2-minute walkthrough",
+      description: "A quick, 20-second walkthrough",
       icon: "popup/icons/walkthrough.svg",
       hoverColor: "#4285f4",
       url: "https://abinjohn123.github.io/sidesy-landing/",
