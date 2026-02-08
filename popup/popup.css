@@ -87,14 +87,29 @@ body {
   flex-shrink: 0;
   width: 22px;
   height: 22px;
+  color: #1a1a1a;
   opacity: 0.5;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-              opacity 0.15s ease;
+              opacity 0.15s ease,
+              color 0.2s ease;
+}
+
+.link-icon svg {
+  display: block;
+  stroke: currentColor;
+  fill: none;
+  transition: fill 0.2s ease;
+}
+
+#popup-menu a:hover .link-icon svg {
+  fill: var(--icon-hover-color);
+  fill-opacity: 0.15;
 }
 
 #popup-menu a:hover .link-icon {
   transform: scale(1.1) rotate(-8deg);
   opacity: 0.85;
+  color: var(--icon-hover-color);
 }
 
 /* ── Text ── */
