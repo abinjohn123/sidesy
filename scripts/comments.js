@@ -10,6 +10,13 @@ let currentObserver = null;
 let currentInterval = null;
 let activated = false;
 
+// Resize state
+const SIDEBAR_MIN_WIDTH = 300;
+const SIDEBAR_MAX_WIDTH = 700;
+const SIDEBAR_DEFAULT_WIDTH = 426; // YouTube's native #secondary width
+let resizeHandle = null;
+let isResizing = false;
+
 function cleanup() {
   if (currentObserver) {
     currentObserver.disconnect();
@@ -19,6 +26,8 @@ function cleanup() {
     clearInterval(currentInterval);
     currentInterval = null;
   }
+  teardownResizeHandle();
+  resetSidebarWidth();
   activated = false;
 }
 
@@ -166,6 +175,124 @@ function savePosition(position) {
 }
 
 /*
+Sidebar width persistence and resize handle
+*/
+
+function saveSidebarWidth(width) {
+  chrome.storage.local.set({ sidebar_width: width });
+}
+
+function loadSidebarWidth() {
+  return chrome.storage.local.get(['sidebar_width']).then((data) => {
+    return data.sidebar_width || SIDEBAR_DEFAULT_WIDTH;
+  });
+}
+
+function applySidebarWidth(width) {
+  const secondary = document.querySelector('#secondary');
+  const primary = document.querySelector('#primary');
+  if (!secondary) return;
+
+  const clamped = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width));
+  secondary.style.width = clamped + 'px';
+  secondary.style.minWidth = clamped + 'px';
+  secondary.style.maxWidth = clamped + 'px';
+
+  if (primary) {
+    primary.classList.add('sidesy-custom-width');
+  }
+}
+
+function resetSidebarWidth() {
+  const secondary = document.querySelector('#secondary');
+  const primary = document.querySelector('#primary');
+  if (!secondary) return;
+
+  secondary.style.width = '';
+  secondary.style.minWidth = '';
+  secondary.style.maxWidth = '';
+
+  if (primary) {
+    primary.classList.remove('sidesy-custom-width');
+  }
+}
+
+function createResizeHandle() {
+  const handle = document.createElement('div');
+  handle.classList.add('sidesy-resize-handle');
+  return handle;
+}
+
+function setupResizeHandle() {
+  const secondary = document.querySelector('#secondary');
+  if (!secondary || resizeHandle) return;
+
+  resizeHandle = createResizeHandle();
+  secondary.style.position = 'relative';
+  secondary.prepend(resizeHandle);
+
+  resizeHandle.addEventListener('mousedown', onResizeStart);
+}
+
+function teardownResizeHandle() {
+  if (resizeHandle) {
+    resizeHandle.removeEventListener('mousedown', onResizeStart);
+    resizeHandle.remove();
+    resizeHandle = null;
+  }
+  if (isResizing) {
+    document.removeEventListener('mousemove', onResizeMove);
+    document.removeEventListener('mouseup', onResizeEnd);
+    document.body.classList.remove('sidesy-resizing');
+    isResizing = false;
+  }
+
+  const secondary = document.querySelector('#secondary');
+  if (secondary) {
+    secondary.style.position = '';
+  }
+}
+
+function onResizeStart(e) {
+  e.preventDefault();
+  isResizing = true;
+
+  resizeHandle.classList.add('dragging');
+  document.body.classList.add('sidesy-resizing');
+
+  document.addEventListener('mousemove', onResizeMove);
+  document.addEventListener('mouseup', onResizeEnd);
+}
+
+function onResizeMove(e) {
+  if (!isResizing) return;
+
+  const secondary = document.querySelector('#secondary');
+  if (!secondary) return;
+
+  const secondaryRect = secondary.getBoundingClientRect();
+  const newWidth = secondaryRect.right - e.clientX;
+
+  applySidebarWidth(newWidth);
+}
+
+function onResizeEnd() {
+  if (!isResizing) return;
+  isResizing = false;
+
+  resizeHandle.classList.remove('dragging');
+  document.body.classList.remove('sidesy-resizing');
+
+  document.removeEventListener('mousemove', onResizeMove);
+  document.removeEventListener('mouseup', onResizeEnd);
+
+  const secondary = document.querySelector('#secondary');
+  if (secondary) {
+    saveSidebarWidth(Math.round(secondary.getBoundingClientRect().width));
+  }
+}
+
+/*
 Gathers info from the page, like the theme and DOM Tree.
 A button is then added to the comments section to toggle between
 default view and sidebar view, and event listeners are attached.
@@ -190,6 +317,9 @@ function activateExtension() {
   popButton.classList.add('comments-header-btn');
 
   function defaultView() {
+    teardownResizeHandle();
+    resetSidebarWidth();
+
     commentsEl.style.display = 'none';
     commentsEl.classList.remove('popout', 'dark-mode', 'light-mode');
     commentsEl.style.height = 'auto';
@@ -237,6 +367,11 @@ function activateExtension() {
     page.scrollIntoView({ behavior: 'smooth' });
 
     savePosition('sidebar');
+
+    loadSidebarWidth().then((width) => {
+      applySidebarWidth(width);
+      setupResizeHandle();
+    });
   }
 
   if (!commentsEl.querySelector('header')) {

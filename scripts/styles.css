@@ -74,3 +74,55 @@
   height: 28px;
   transform: rotate(-45deg);
 }
+
+/* ── Resize Handle ── */
+
+.sidesy-resize-handle {
+  position: absolute;
+  top: 0;
+  left: -5px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 100;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.sidesy-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 4px;
+  width: 5px;
+  height: 100%;
+  transition: background-color 0.15s ease;
+}
+
+html[dark] .sidesy-resize-handle:hover::after,
+html[dark] .sidesy-resize-handle.dragging::after {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+html:not([dark]) .sidesy-resize-handle:hover::after,
+html:not([dark]) .sidesy-resize-handle.dragging::after {
+  background-color: rgba(15, 15, 15, 0.4);
+}
+
+body.sidesy-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.sidesy-resizing * {
+  cursor: col-resize !important;
+}
+
+body.sidesy-resizing iframe {
+  pointer-events: none !important;
+}
+
+.sidesy-custom-width .video-stream.html5-main-video {
+  width: 100% !important;
+  height: auto !important;
+}
