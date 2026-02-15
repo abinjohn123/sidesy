@@ -196,9 +196,24 @@ function activateExtension() {
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
 
+  const platform = navigator.userAgentData?.platform ?? navigator.platform;
+  const isMac = /Mac|iPod|iPhone|iPad/i.test(platform);
+  const shortcutKey = isMac ? '⌥\u2002S' : 'Alt\u2002+\u2002S';
+
   const popButton = document.createElement('button');
   popButton.id = TOGGLE_BTN_ID;
   popButton.classList.add('comments-header-btn');
+
+  const iconContainer = document.createElement('span');
+  popButton.appendChild(iconContainer);
+
+  const tooltip = document.createElement('span');
+  tooltip.classList.add('sidesy-tooltip');
+  popButton.appendChild(tooltip);
+
+  function updateTooltip(text) {
+    tooltip.innerHTML = `${text} <span class="sidesy-tooltip-key">${shortcutKey}</span>`;
+  }
 
   function defaultView() {
     commentsEl.style.display = 'none';
@@ -208,7 +223,8 @@ function activateExtension() {
     popButton.removeEventListener('click', defaultView);
     popButton.addEventListener('click', sidebarView);
 
-    popButton.innerHTML = `
+    updateTooltip('Show comments in sidebar');
+    iconContainer.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
         isDark ? 'stroke-light' : 'stroke-dark'
       }">
@@ -236,11 +252,12 @@ function activateExtension() {
       commentsEl.scrollIntoView({ behavior: 'smooth' });
     });
 
-    popButton.innerHTML = `
+    updateTooltip('Show comments below video');
+    iconContainer.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
       isDark ? 'stroke-light' : 'stroke-dark'
     }">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 9l-3 3m0 0l3 3m-3-3h7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"" />
+      <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 9l-3 3m0 0l3 3m-3-3h7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>`;
 
     sidebar.prepend(commentsEl);
