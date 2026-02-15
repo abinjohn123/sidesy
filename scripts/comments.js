@@ -166,6 +166,68 @@ function savePosition(position) {
 }
 
 /*
+Shows a dismissable "What's New" banner inside the sidebar view
+if there is a pending announcement in storage.
+*/
+function maybeShowAnnouncement(commentsEl, isDark) {
+  chrome.storage.local.get(["pending_announcement"]).then((data) => {
+    const version = data.pending_announcement;
+    if (!version) return;
+
+    const items = CONSTANTS.ANNOUNCEMENT.items;
+    if (!items || items.length === 0) return;
+
+    // Guard against duplicate injection
+    if (document.querySelector('.sidesy-announcement')) return;
+
+    const banner = document.createElement('div');
+    banner.classList.add('sidesy-announcement', isDark ? 'dark-mode' : 'light-mode');
+
+    const titleRow = document.createElement('div');
+    titleRow.classList.add('sidesy-announcement-title');
+
+    const icon = document.createElement('img');
+    icon.src = chrome.runtime.getURL('images/sidesy-128.png');
+    icon.classList.add('sidesy-announcement-icon');
+
+    const heading = document.createElement('span');
+    heading.textContent = "What's New in Sidesy";
+
+    const dismissBtn = document.createElement('button');
+    dismissBtn.classList.add('sidesy-announcement-dismiss');
+    dismissBtn.setAttribute('aria-label', 'Dismiss announcement');
+    const dismissIcon = document.createElement('img');
+    dismissIcon.src = chrome.runtime.getURL('images/close.svg');
+    dismissIcon.classList.add('sidesy-announcement-dismiss-icon');
+    dismissBtn.append(dismissIcon);
+    dismissBtn.addEventListener('click', () => {
+      chrome.storage.local.set({
+        last_seen_announcement: version,
+        pending_announcement: null,
+      });
+      banner.remove();
+    });
+
+    titleRow.append(icon, heading, dismissBtn);
+
+    const list = document.createElement('ul');
+    list.classList.add('sidesy-announcement-list');
+    for (const item of items) {
+      const li = document.createElement('li');
+      li.textContent = item;
+      list.append(li);
+    }
+
+    banner.append(titleRow, list);
+
+    const sidebar = document.querySelector('#secondary-inner');
+    if (sidebar) {
+      sidebar.prepend(banner);
+    }
+  });
+}
+
+/*
 Gathers info from the page, like the theme and DOM Tree.
 A button is then added to the comments section to toggle between
 default view and sidebar view, and event listeners are attached.
@@ -284,4 +346,6 @@ function activateExtension() {
     if (data.comments_placement === 'default') defaultView();
     else sidebarView();
   });
+
+  maybeShowAnnouncement(commentsEl, isDark);
 }

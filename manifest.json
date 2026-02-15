@@ -9,6 +9,7 @@
         "https://www.youtube.com/*"
       ],
       "js": [
+        "constants.js",
         "scripts/comments.js"
       ],
       "css": [
@@ -30,5 +31,11 @@
   ],
   "icons": {
     "128": "images/sidesy-128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["images/sidesy-128.png", "images/close.svg"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ]
 }

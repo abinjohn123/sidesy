@@ -30,4 +30,11 @@ const CONSTANTS = {
       url: "https://buymeacoffee.com/abin.john",
     },
   ],
+  ANNOUNCEMENT: {
+    items: [
+      "Comments now appear in a sidebar",
+      "Dark mode support",
+      "Quick links in the popup",
+    ],
+  },
 };
