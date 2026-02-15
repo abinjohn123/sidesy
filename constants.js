@@ -32,9 +32,9 @@ const CONSTANTS = {
   ],
   ANNOUNCEMENT: {
     items: [
-      "Comments now appear in a sidebar",
-      "Dark mode support",
-      "Quick links in the popup",
+      "Comments now appear in a sidebar\nWatch videos while reading comments side by side",
+      "Dark mode support\nAutomatically matches your YouTube theme",
+      "Quick links in the popup\nAccess walkthrough, feedback, and more from the extension icon",
     ],
   },
 };

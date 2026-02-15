@@ -214,7 +214,14 @@ function maybeShowAnnouncement(commentsEl, isDark) {
     list.classList.add('sidesy-announcement-list');
     for (const item of items) {
       const li = document.createElement('li');
-      li.textContent = item;
+      const [title, ...rest] = item.split('\n');
+      const titleEl = document.createElement('strong');
+      titleEl.textContent = title;
+      li.append(titleEl);
+      if (rest.length > 0) {
+        li.append(document.createElement('br'));
+        li.append(document.createTextNode(rest.join(' ')));
+      }
       list.append(li);
     }
 
