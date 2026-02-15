@@ -5,10 +5,20 @@ we listen for YouTube's own `yt-navigate-finish` event to detect
 page navigation and then watch for comments to become ready.
 */
 
+const TOGGLE_BTN_ID = 'sidesy-toggle-btn';
+
 // State for the current navigation
 let currentObserver = null;
 let currentInterval = null;
 let activated = false;
+
+// Listen for keyboard shortcut messages from the background script
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.action === 'toggle-sidebar') {
+    const popButton = document.getElementById(TOGGLE_BTN_ID);
+    if (popButton) popButton.click();
+  }
+});
 
 function cleanup() {
   if (currentObserver) {
@@ -187,6 +197,7 @@ function activateExtension() {
   commentsEl.classList.add('extension-control');
 
   const popButton = document.createElement('button');
+  popButton.id = TOGGLE_BTN_ID;
   popButton.classList.add('comments-header-btn');
 
   function defaultView() {

@@ -19,6 +19,14 @@
   "background": {
     "service_worker": "background.js"
   },
+  "commands": {
+    "toggle-sidebar": {
+      "suggested_key": {
+        "default": "Alt+S"
+      },
+      "description": "Toggle comments sidebar"
+    }
+  },
   "permissions": ["storage"],
   "icons": {
     "128": "images/sidesy-128.png"
