@@ -94,7 +94,38 @@ jobs:
           fi
 
           echo "Upload successful, waiting for validation..."
-          sleep 15
+
+          for i in $(seq 1 12); do
+            sleep 10
+            JWT_TOKEN=$(python3 -c "
+          import jwt, time, uuid, os
+          payload = {
+              'iss': os.environ['FIREFOX_JWT_ISSUER'],
+              'iat': int(time.time()),
+              'exp': int(time.time()) + 300,
+              'jti': str(uuid.uuid4())
+          }
+          print(jwt.encode(payload, os.environ['FIREFOX_JWT_SECRET'], algorithm='HS256'))
+            ")
+            echo "::add-mask::${JWT_TOKEN}"
+
+            VALID=$(curl -s --max-time 30 \
+              -H "Authorization: JWT ${JWT_TOKEN}" \
+              "https://addons.mozilla.org/api/v5/addons/upload/${UPLOAD_UUID}/" | jq -r '.valid')
+
+            echo "Validation check $i: $VALID"
+            if [ "$VALID" = "true" ]; then
+              break
+            elif [ "$VALID" = "false" ]; then
+              echo "Validation failed"
+              exit 1
+            fi
+          done
+
+          if [ "$VALID" != "true" ]; then
+            echo "Validation timed out"
+            exit 1
+          fi
 
           JWT_TOKEN=$(python3 -c "
           import jwt, time, uuid, os
