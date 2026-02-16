@@ -81,7 +81,7 @@
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 9999;
+  z-index: 1000;
   max-width: 360px;
   padding: 12px 16px;
   border: 2px solid transparent;
