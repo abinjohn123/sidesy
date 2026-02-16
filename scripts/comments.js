@@ -169,7 +169,7 @@ function savePosition(position) {
 Shows a dismissable "What's New" banner inside the sidebar view
 if there is a pending announcement in storage.
 */
-function maybeShowAnnouncement(commentsEl, isDark) {
+function maybeShowAnnouncement(isDark) {
   chrome.storage.local.get(["pending_announcement"]).then((data) => {
     const version = data.pending_announcement;
     if (!version) return;
@@ -205,7 +205,8 @@ function maybeShowAnnouncement(commentsEl, isDark) {
         last_seen_announcement: version,
         pending_announcement: null,
       });
-      banner.remove();
+      banner.classList.add('sidesy-slide-out');
+      banner.addEventListener('animationend', () => banner.remove(), { once: true });
     });
 
     titleRow.append(icon, heading, dismissBtn);
@@ -227,10 +228,7 @@ function maybeShowAnnouncement(commentsEl, isDark) {
 
     banner.append(titleRow, list);
 
-    const sidebar = document.querySelector('#secondary-inner');
-    if (sidebar) {
-      sidebar.prepend(banner);
-    }
+    document.body.append(banner);
   });
 }
 
@@ -354,5 +352,5 @@ function activateExtension() {
     else sidebarView();
   });
 
-  maybeShowAnnouncement(commentsEl, isDark);
+  maybeShowAnnouncement(isDark);
 }
