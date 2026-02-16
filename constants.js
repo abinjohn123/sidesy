@@ -32,9 +32,10 @@ const CONSTANTS = {
   ],
   ANNOUNCEMENT: {
     items: [
-      "Comments now appear in a sidebar\nWatch videos while reading comments side by side",
-      "Dark mode support\nAutomatically matches your YouTube theme",
-      "Quick links in the popup\nAccess walkthrough, feedback, and more from the extension icon",
+      "Announcements\nSidesy will now keep you posted on product updates, like this one.",
+      "New Extension Menu\nClick the Sidesy icon in your browser toolbar to access quick links for the walkthrough, feedback, and more.",
+      "Loading Fix\nAddressed the extension not loading issue while opening, navigating between, or refreshing YouTube videos. Thanks for letting me know!",
+      "Privacy Update\nRemoved the \"tabs\" browser permission, so the extension now asks for less access.",
     ],
   },
 };
