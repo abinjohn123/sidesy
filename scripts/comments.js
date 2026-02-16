@@ -10,6 +10,18 @@ let currentObserver = null;
 let currentInterval = null;
 let activated = false;
 
+const WATCH_PAGE_PATTERN = 'youtube.com/watch';
+const ANNOUNCEMENT_TOAST_ID = 'sidesy-announcement';
+
+function isWatchPageUrl() {
+  return location.href.includes(WATCH_PAGE_PATTERN);
+}
+
+function removeAnnouncementToast() {
+  const banner = document.getElementById(ANNOUNCEMENT_TOAST_ID);
+  if (banner) banner.remove();
+}
+
 function cleanup() {
   if (currentObserver) {
     currentObserver.disconnect();
@@ -90,11 +102,14 @@ function startPeriodicCheck() {
 }
 
 function onNavigate() {
-  const isWatchPage = location.href.includes('youtube.com/watch');
+  const isWatchPage = isWatchPageUrl();
 
   cleanup();
 
-  if (!isWatchPage) return;
+  if (!isWatchPage) {
+    removeAnnouncementToast();
+    return;
+  }
 
   detectComments();
 }
@@ -105,12 +120,12 @@ document.addEventListener('yt-navigate-finish', onNavigate);
 // Also handle the initial page load (e.g. direct URL paste or refresh)
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    if (location.href.includes('youtube.com/watch')) {
+    if (isWatchPageUrl()) {
       cleanup();
       detectComments();
     }
   });
-} else if (location.href.includes('youtube.com/watch')) {
+} else if (isWatchPageUrl()) {
   detectComments();
 }
 
@@ -170,7 +185,11 @@ Shows a dismissable "What's New" banner inside the sidebar view
 if there is a pending announcement in storage.
 */
 function maybeShowAnnouncement(isDark) {
+  if (!isWatchPageUrl()) return;
+
   chrome.storage.local.get(["pending_announcement"]).then((data) => {
+    if (!isWatchPageUrl()) return;
+
     const version = data.pending_announcement;
     if (!version) return;
 
@@ -178,9 +197,10 @@ function maybeShowAnnouncement(isDark) {
     if (!items || items.length === 0) return;
 
     // Guard against duplicate injection
-    if (document.querySelector('.sidesy-announcement')) return;
+    if (document.getElementById(ANNOUNCEMENT_TOAST_ID)) return;
 
     const banner = document.createElement('div');
+    banner.id = ANNOUNCEMENT_TOAST_ID;
     banner.classList.add('sidesy-announcement', isDark ? 'dark-mode' : 'light-mode');
 
     const titleRow = document.createElement('div');
