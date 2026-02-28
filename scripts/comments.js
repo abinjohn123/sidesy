@@ -140,49 +140,6 @@ if (document.readyState === 'loading') {
 }
 
 /*
-Goes through the comments, determines if the number of lines
-is more than 4, and displays the 'Read More' button
-to expand the comments.
-*/
-
-function expandComments(commentsEl) {
-  const commentTextContainer = commentsEl.querySelectorAll(
-    '#expander.style-scope.ytd-comment-view-model'
-  );
-
-  const lineHeight =
-    commentTextContainer.length > 0
-      ? Number.parseFloat(
-          getComputedStyle(
-            commentTextContainer[0].querySelector('#content-text')
-          ).lineHeight
-        )
-      : 20;
-
-  function showExpandButton(comment, shouldShow) {
-    const btnMore = comment.querySelector('#more');
-    const btnLess = comment.querySelector('#less');
-
-    if (!shouldShow) {
-      btnMore.setAttribute('hidden', '');
-      btnLess.setAttribute('hidden', '');
-      return;
-    }
-
-    btnLess.setAttribute('hidden', '');
-    btnMore.removeAttribute('hidden');
-  }
-
-  commentTextContainer.forEach((comment) => {
-    comment.querySelector('#content').offsetHeight;
-    const textContainerHeight =
-      comment.querySelector('#content-text').offsetHeight;
-    const lines = Math.ceil(textContainerHeight / lineHeight);
-    showExpandButton(comment, lines > 4);
-  });
-}
-
-/*
 Save current extension position locally
 */
 
@@ -298,6 +255,93 @@ function activateExtension() {
   tooltip.classList.add('sidesy-tooltip');
   popButton.appendChild(tooltip);
 
+  function isSidebarMode() {
+    return commentsEl.classList.contains('popout');
+  }
+
+  function getActiveViewport(mode) {
+    if (mode === 'sidebar') {
+      const rect = commentsEl.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom };
+    }
+    return { top: 0, bottom: window.innerHeight };
+  }
+
+  // Returns the comment thread currently rendered at a viewport point.
+  // We use this for fast anchor detection instead of scanning all threads.
+  function findThreadFromPoint(x, y) {
+    const elements = document.elementsFromPoint(x, y);
+    for (const el of elements) {
+      const thread = el.closest?.('ytd-comment-thread-renderer');
+      if (thread && commentsEl.contains(thread)) return thread;
+    }
+    return null;
+  }
+
+  // Finds the top-most visible comment thread by sampling a few points
+  // from top to bottom of the active viewport/container.
+  function findTopVisibleThread(mode) {
+    const { top, bottom } = getActiveViewport(mode);
+    const rect = commentsEl.getBoundingClientRect();
+    // Keep sample points away from viewport edges where sticky headers/overlays
+    // can interfere. `8` is the screen edge gutter, `16` avoids left UI chrome.
+    const sampleX = Math.max(
+      8,
+      Math.min(window.innerWidth - 8, rect.left + Math.max(rect.width / 2, 16))
+    );
+    // `12` px top/bottom inset avoids boundary flicker around container edges.
+    const startY = Math.max(0, Math.min(window.innerHeight - 1, top + 12));
+    const endY = Math.max(0, Math.min(window.innerHeight - 1, bottom - 12));
+    // 6 samples balance accuracy and toggle-time performance on long comment lists.
+    const steps = 6;
+
+    for (let i = 0; i < steps; i += 1) {
+      const ratio = steps === 1 ? 0 : i / (steps - 1);
+      const y = startY + (endY - startY) * ratio;
+      const thread = findThreadFromPoint(sampleX, y);
+      if (thread) return thread;
+    }
+    return null;
+  }
+
+  function captureTopCommentAnchor() {
+    const mode = isSidebarMode() ? 'sidebar' : 'default';
+    const { top } = getActiveViewport(mode);
+    const anchor = findTopVisibleThread(mode);
+    if (!anchor) return null;
+
+    return {
+      element: anchor,
+      offset: anchor.getBoundingClientRect().top - top,
+    };
+  }
+
+  function getAnchorDelta(anchor, mode) {
+    if (!anchor) return;
+
+    let anchorEl = anchor.element;
+    if (!anchorEl || !anchorEl.isConnected) return null;
+
+    const { top } = getActiveViewport(mode);
+    const currentTop = anchorEl.getBoundingClientRect().top;
+    const targetTop = top + anchor.offset;
+    const delta = currentTop - targetTop;
+    if (Math.abs(delta) < 1) return 0;
+    return delta;
+  }
+
+  function restoreTopCommentAnchor(anchor, mode) {
+    const delta = getAnchorDelta(anchor, mode);
+    if (delta === null || delta === 0) return;
+
+    if (mode === 'sidebar') {
+      commentsEl.scrollTop += delta;
+      return;
+    }
+
+    window.scrollBy({ top: delta, behavior: 'auto' });
+  }
+
   function updateTooltip(text) {
     tooltip.innerHTML = `${text} <span class="sidesy-tooltip-key">${shortcutKey}</span>`;
   }
@@ -306,9 +350,6 @@ function activateExtension() {
     commentsEl.style.display = 'none';
     commentsEl.classList.remove('popout', 'dark-mode', 'light-mode');
     commentsEl.style.height = 'auto';
-
-    popButton.removeEventListener('click', defaultView);
-    popButton.addEventListener('click', sidebarView);
 
     updateTooltip('Show comments in sidebar');
     iconContainer.innerHTML = `
@@ -329,14 +370,9 @@ function activateExtension() {
       videoSizeButton.click();
     }
     commentsEl.classList.add('popout', isDark ? 'dark-mode' : 'light-mode');
-    setTimeout(() => {
+    commentsEl.style.height = `${player.offsetHeight}px`;
+    requestAnimationFrame(() => {
       commentsEl.style.height = `${player.offsetHeight}px`;
-    }, 0);
-    popButton.removeEventListener('click', sidebarView);
-    popButton.addEventListener('click', () => {
-      defaultView();
-      expandComments(commentsEl);
-      commentsEl.scrollIntoView({ behavior: 'smooth' });
     });
 
     updateTooltip('Show comments below video');
@@ -348,10 +384,34 @@ function activateExtension() {
     </svg>`;
 
     sidebar.prepend(commentsEl);
-    expandComments(commentsEl);
-    page.scrollIntoView({ behavior: 'smooth' });
 
     savePosition('sidebar');
+  }
+
+  function switchMode(targetMode, preserveAnchor = true) {
+    const anchor = preserveAnchor ? captureTopCommentAnchor() : null;
+
+    if (targetMode === 'sidebar') sidebarView();
+    else defaultView();
+
+    if (targetMode === 'sidebar') {
+      page.scrollIntoView({ behavior: 'smooth' });
+      if (!anchor) return;
+      requestAnimationFrame(() => {
+        restoreTopCommentAnchor(anchor, 'sidebar');
+      });
+      return;
+    }
+
+    if (!anchor) return;
+
+    requestAnimationFrame(() => {
+      restoreTopCommentAnchor(anchor, targetMode);
+    });
+  }
+
+  function handleToggleClick() {
+    switchMode(isSidebarMode() ? 'default' : 'sidebar');
   }
 
   if (!commentsEl.querySelector('header')) {
@@ -361,39 +421,14 @@ function activateExtension() {
     commentsEl.prepend(header);
   }
 
-  // Click event listener to handle the 'Read More' and 'Show Less' button clicks.
-  function handleExpandButtonClick(e) {
-    if (
-      !e.target.classList.contains('more-button') &&
-      !e.target.classList.contains('less-button')
-    )
-      return;
-
-    const commentContainer = e.target.closest(
-      '#expander.style-scope.ytd-comment-view-model'
-    );
-    const btnMore = commentContainer.querySelector('#more');
-    const btnLess = commentContainer.querySelector('#less');
-
-    if (e.target.classList.contains('more-button')) {
-      btnMore.setAttribute('hidden', '');
-      btnLess.removeAttribute('hidden');
-      commentContainer.removeAttribute('collapsed');
-    } else {
-      btnMore.removeAttribute('hidden');
-      btnLess.setAttribute('hidden', '');
-      commentContainer.setAttribute('collapsed', '');
-    }
-  }
-
   videoSizeButton.addEventListener('click', () => {
     boolTheaterMode = !boolTheaterMode;
 
-    if (boolTheaterMode) {
-      defaultView();
+    if (boolTheaterMode && isSidebarMode()) {
+      switchMode('default');
     }
   });
-  commentsEl.addEventListener('click', handleExpandButtonClick);
+  popButton.addEventListener('click', handleToggleClick);
 
   chrome.storage.local.get(['comments_placement']).then((data) => {
     if (data.comments_placement === 'default') defaultView();
