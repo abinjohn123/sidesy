@@ -32,7 +32,8 @@ const CONSTANTS = {
   ],
   ANNOUNCEMENT: {
     items: [
-      "Keyboard Shortcut\nYou can now toggle the comments position using {{TOGGLE_SHORTCUT}}.",
+      "Toggle via Shortcut\nYou can now toggle the comments position using {{TOGGLE_SHORTCUT}}.",
+      "Seamless View Switching\nWhen you toggle comments position, Sidesy restores scroll so you can keep reading without interruption.",
     ],
   },
 };
