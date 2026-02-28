@@ -5,16 +5,9 @@
   "description": "Bring YouTube comments to the side. Dive into the comments without scrolling past the video.",
   "content_scripts": [
     {
-      "matches": [
-        "https://www.youtube.com/*"
-      ],
-      "js": [
-        "constants.js",
-        "scripts/comments.js"
-      ],
-      "css": [
-        "scripts/styles.css"
-      ]
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["constants.js", "scripts/comments.js"],
+      "css": ["scripts/styles.css"]
     }
   ],
   "browser_action": {
@@ -24,20 +17,20 @@
     }
   },
   "background": {
-    "scripts": [
-      "constants.js",
-      "background.js"
-    ],
+    "scripts": ["constants.js", "background.js"],
     "persistent": false
   },
-  "permissions": [
-    "storage"
-  ],
+  "commands": {
+    "toggle-sidebar": {
+      "suggested_key": {
+        "default": "Alt+S"
+      },
+      "description": "Toggle comments sidebar"
+    }
+  },
+  "permissions": ["storage"],
   "icons": {
     "128": "images/sidesy-128.png"
   },
-  "web_accessible_resources": [
-    "images/sidesy-128.png",
-    "images/close.svg"
-  ]
+  "web_accessible_resources": ["images/sidesy-128.png", "images/close.svg"]
 }
