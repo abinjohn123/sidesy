@@ -32,10 +32,7 @@ const CONSTANTS = {
   ],
   ANNOUNCEMENT: {
     items: [
-      "Announcements\nSidesy will now keep you posted on product updates, like this one.",
-      "New Extension Menu\nClick the Sidesy icon in your browser toolbar to access quick links for the walkthrough, feedback, and more.",
-      "Loading Fix\nAddressed the extension not loading issue while opening, navigating between, or refreshing YouTube videos. Thanks for letting me know!",
-      "Privacy Update\nRemoved the \"tabs\" browser permission, so the extension now asks for less access.",
+      "Keyboard Shortcut\nYou can now toggle the comments position using {{TOGGLE_SHORTCUT}}.",
     ],
   },
 };
