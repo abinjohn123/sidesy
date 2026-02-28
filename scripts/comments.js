@@ -20,6 +20,18 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+const WATCH_PAGE_PATTERN = 'youtube.com/watch';
+const ANNOUNCEMENT_TOAST_ID = 'sidesy-announcement';
+
+function isWatchPageUrl() {
+  return location.href.includes(WATCH_PAGE_PATTERN);
+}
+
+function removeAnnouncementToast() {
+  const banner = document.getElementById(ANNOUNCEMENT_TOAST_ID);
+  if (banner) banner.remove();
+}
+
 function cleanup() {
   if (currentObserver) {
     currentObserver.disconnect();
@@ -100,11 +112,14 @@ function startPeriodicCheck() {
 }
 
 function onNavigate() {
-  const isWatchPage = location.href.includes('youtube.com/watch');
+  const isWatchPage = isWatchPageUrl();
 
   cleanup();
 
-  if (!isWatchPage) return;
+  if (!isWatchPage) {
+    removeAnnouncementToast();
+    return;
+  }
 
   detectComments();
 }
@@ -115,12 +130,12 @@ document.addEventListener('yt-navigate-finish', onNavigate);
 // Also handle the initial page load (e.g. direct URL paste or refresh)
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    if (location.href.includes('youtube.com/watch')) {
+    if (isWatchPageUrl()) {
       cleanup();
       detectComments();
     }
   });
-} else if (location.href.includes('youtube.com/watch')) {
+} else if (isWatchPageUrl()) {
   detectComments();
 }
 
@@ -173,6 +188,78 @@ Save current extension position locally
 
 function savePosition(position) {
   chrome.storage.local.set({ comments_placement: position });
+}
+
+/*
+Shows a dismissable "What's New" banner inside the sidebar view
+if there is a pending announcement in storage.
+*/
+function maybeShowAnnouncement(isDark) {
+  if (!isWatchPageUrl()) return;
+
+  chrome.storage.local.get(["pending_announcement"]).then((data) => {
+    if (!isWatchPageUrl()) return;
+
+    const version = data.pending_announcement;
+    if (!version) return;
+
+    const items = CONSTANTS.ANNOUNCEMENT.items;
+    if (!items || items.length === 0) return;
+
+    // Guard against duplicate injection
+    if (document.getElementById(ANNOUNCEMENT_TOAST_ID)) return;
+
+    const banner = document.createElement('div');
+    banner.id = ANNOUNCEMENT_TOAST_ID;
+    banner.classList.add('sidesy-announcement', isDark ? 'dark-mode' : 'light-mode');
+
+    const titleRow = document.createElement('div');
+    titleRow.classList.add('sidesy-announcement-title');
+
+    const icon = document.createElement('img');
+    icon.src = chrome.runtime.getURL('images/sidesy-128.png');
+    icon.classList.add('sidesy-announcement-icon');
+
+    const heading = document.createElement('span');
+    heading.textContent = "What's New in Sidesy";
+
+    const dismissBtn = document.createElement('button');
+    dismissBtn.classList.add('sidesy-announcement-dismiss');
+    dismissBtn.setAttribute('aria-label', 'Dismiss announcement');
+    const dismissIcon = document.createElement('img');
+    dismissIcon.src = chrome.runtime.getURL('images/close.svg');
+    dismissIcon.classList.add('sidesy-announcement-dismiss-icon');
+    dismissBtn.append(dismissIcon);
+    dismissBtn.addEventListener('click', () => {
+      chrome.storage.local.set({
+        last_seen_announcement: version,
+        pending_announcement: null,
+      });
+      banner.classList.add('sidesy-slide-out');
+      banner.addEventListener('animationend', () => banner.remove(), { once: true });
+    });
+
+    titleRow.append(icon, heading, dismissBtn);
+
+    const list = document.createElement('ul');
+    list.classList.add('sidesy-announcement-list');
+    for (const item of items) {
+      const li = document.createElement('li');
+      const [title, ...rest] = item.split('\n');
+      const titleEl = document.createElement('strong');
+      titleEl.textContent = title;
+      li.append(titleEl);
+      if (rest.length > 0) {
+        li.append(document.createElement('br'));
+        li.append(document.createTextNode(rest.join(' ')));
+      }
+      list.append(li);
+    }
+
+    banner.append(titleRow, list);
+
+    document.body.append(banner);
+  });
 }
 
 /*
@@ -312,4 +399,6 @@ function activateExtension() {
     if (data.comments_placement === 'default') defaultView();
     else sidebarView();
   });
+
+  maybeShowAnnouncement(isDark);
 }
