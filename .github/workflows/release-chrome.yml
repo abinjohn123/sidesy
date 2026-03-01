@@ -66,6 +66,7 @@ jobs:
             -x ".git/*" \
             -x ".github/*" \
             -x ".claude/*" \
+            -x "dev-tools/*" \
             -x "images/1.png" \
             -x "images/2.png" \
             -x "images/3.png" \
