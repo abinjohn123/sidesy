@@ -23,7 +23,7 @@
   "commands": {
     "toggle-sidebar": {
       "suggested_key": {
-        "default": "Alt+S"
+        "default": "Alt+Shift+S"
       },
       "description": "Toggle comments sidebar"
     }

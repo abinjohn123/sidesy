@@ -13,10 +13,38 @@ let currentInterval = null;
 let activated = false;
 
 // Listen for keyboard shortcut messages from the background script
+function triggerSidebarToggle() {
+  const popButton = document.getElementById(TOGGLE_BTN_ID);
+  if (popButton) popButton.click();
+}
+
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'toggle-sidebar') {
-    const popButton = document.getElementById(TOGGLE_BTN_ID);
-    if (popButton) popButton.click();
+    triggerSidebarToggle();
+  }
+});
+
+// Firefox may not always apply `commands` bindings as expected.
+// Keep a local fallback shortcut handler for Alt/Option + Shift + S.
+document.addEventListener('keydown', (event) => {
+  const target = event.target;
+  const isEditable = target &&
+    (target.isContentEditable ||
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT');
+
+  if (isEditable) return;
+
+  const isShortcut = event.altKey &&
+    event.shiftKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    event.code === 'KeyS';
+
+  if (isShortcut) {
+    event.preventDefault();
+    triggerSidebarToggle();
   }
 });
 
@@ -242,7 +270,9 @@ function activateExtension() {
 
   const platform = navigator.userAgentData?.platform ?? navigator.platform;
   const isMac = /Mac|iPod|iPhone|iPad/i.test(platform);
-  const shortcutKey = isMac ? '⌥\u2002S' : 'Alt\u2002+\u2002S';
+  const shortcutKey = isMac
+    ? '⌥\u2002+\u2002⇧\u2002+\u2002S'
+    : 'Alt\u2002+\u2002Shift\u2002+\u2002S';
 
   const popButton = document.createElement('button');
   popButton.id = TOGGLE_BTN_ID;
