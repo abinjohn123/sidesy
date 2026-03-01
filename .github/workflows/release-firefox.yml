@@ -30,15 +30,35 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
-          git commit -m "chore: bump version to ${{ inputs.version }}"
+          if git diff --cached --quiet; then
+            echo "No manifest changes to commit. Continuing."
+          else
+            git commit -m "chore: bump version to ${{ inputs.version }}"
+          fi
 
       - name: Create tag
-        run: git tag "firefox-v${{ inputs.version }}"
+        run: |
+          if git ls-remote --tags --exit-code origin "refs/tags/firefox-v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Tag firefox-v${{ inputs.version }} already exists on origin. Skipping."
+            echo "TAG_EXISTS=true" >> "$GITHUB_ENV"
+          else
+            git tag "firefox-v${{ inputs.version }}"
+            echo "TAG_EXISTS=false" >> "$GITHUB_ENV"
+          fi
 
       - name: Push commit and tag
         run: |
-          git push origin firefox-support
-          git push origin "firefox-v${{ inputs.version }}"
+          if [ "$(git rev-list --count origin/firefox-support..HEAD)" -gt 0 ]; then
+            git push origin firefox-support
+          else
+            echo "No new commits to push to firefox-support."
+          fi
+
+          if [ "${TAG_EXISTS}" = "false" ]; then
+            git push origin "firefox-v${{ inputs.version }}"
+          else
+            echo "No new tag to push."
+          fi
 
       - name: Zip extension files
         run: |
@@ -57,10 +77,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "firefox-v${{ inputs.version }}" \
-            "sidesy-firefox-v${{ inputs.version }}.zip" \
-            --title "Firefox v${{ inputs.version }}" \
-            --generate-notes
+          if gh release view "firefox-v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Release firefox-v${{ inputs.version }} already exists. Re-uploading asset."
+            gh release upload "firefox-v${{ inputs.version }}" \
+              "sidesy-firefox-v${{ inputs.version }}.zip" \
+              --clobber
+          else
+            gh release create "firefox-v${{ inputs.version }}" \
+              "sidesy-firefox-v${{ inputs.version }}.zip" \
+              --title "Firefox v${{ inputs.version }}" \
+              --generate-notes
+          fi
 
       - name: Upload to Firefox Add-ons (draft)
         env:

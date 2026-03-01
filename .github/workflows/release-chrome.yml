@@ -30,15 +30,35 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
-          git commit -m "chore: bump version to ${{ inputs.version }}"
+          if git diff --cached --quiet; then
+            echo "No manifest changes to commit. Continuing."
+          else
+            git commit -m "chore: bump version to ${{ inputs.version }}"
+          fi
 
       - name: Create tag
-        run: git tag "chrome-v${{ inputs.version }}"
+        run: |
+          if git ls-remote --tags --exit-code origin "refs/tags/chrome-v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Tag chrome-v${{ inputs.version }} already exists on origin. Skipping."
+            echo "TAG_EXISTS=true" >> "$GITHUB_ENV"
+          else
+            git tag "chrome-v${{ inputs.version }}"
+            echo "TAG_EXISTS=false" >> "$GITHUB_ENV"
+          fi
 
       - name: Push commit and tag
         run: |
-          git push origin master
-          git push origin "chrome-v${{ inputs.version }}"
+          if [ "$(git rev-list --count origin/master..HEAD)" -gt 0 ]; then
+            git push origin master
+          else
+            echo "No new commits to push to master."
+          fi
+
+          if [ "${TAG_EXISTS}" = "false" ]; then
+            git push origin "chrome-v${{ inputs.version }}"
+          else
+            echo "No new tag to push."
+          fi
 
       - name: Zip extension files
         run: |
@@ -57,10 +77,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "chrome-v${{ inputs.version }}" \
-            "sidesy-chrome-v${{ inputs.version }}.zip" \
-            --title "Chrome v${{ inputs.version }}" \
-            --generate-notes
+          if gh release view "chrome-v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Release chrome-v${{ inputs.version }} already exists. Re-uploading asset."
+            gh release upload "chrome-v${{ inputs.version }}" \
+              "sidesy-chrome-v${{ inputs.version }}.zip" \
+              --clobber
+          else
+            gh release create "chrome-v${{ inputs.version }}" \
+              "sidesy-chrome-v${{ inputs.version }}.zip" \
+              --title "Chrome v${{ inputs.version }}" \
+              --generate-notes
+          fi
 
       - name: Upload to Chrome Web Store (draft)
         env:
@@ -68,14 +95,23 @@ jobs:
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
         run: |
-          ACCESS_TOKEN=$(curl -s -X POST https://oauth2.googleapis.com/token \
+          TOKEN_RESPONSE=$(curl -sS -X POST https://oauth2.googleapis.com/token \
             -d "refresh_token=${CHROME_REFRESH_TOKEN}" \
             -d "client_id=${CHROME_CLIENT_ID}" \
             -d "client_secret=${CHROME_CLIENT_SECRET}" \
-            -d "grant_type=refresh_token" | jq -r '.access_token')
+            -d "grant_type=refresh_token")
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty')
+          if [ -z "$ACCESS_TOKEN" ]; then
+            echo "Failed to obtain Google access token."
+            echo "$TOKEN_RESPONSE" | jq 'if type=="object" then del(.access_token, .refresh_token, .id_token) else . end'
+            exit 1
+          fi
+
           echo "::add-mask::${ACCESS_TOKEN}"
 
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+          RESPONSE_FILE=$(mktemp)
+          HTTP_CODE=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
             -H "Authorization: Bearer ${ACCESS_TOKEN}" \
             -H "x-goog-api-version: 2" \
             -X PUT \
@@ -84,7 +120,13 @@ jobs:
 
           if [ "$HTTP_CODE" -ge 400 ]; then
             echo "Upload failed with HTTP $HTTP_CODE"
+            if jq -e . >/dev/null 2>&1 < "$RESPONSE_FILE"; then
+              jq 'if type=="object" then del(.access_token, .refresh_token, .id_token) else . end' "$RESPONSE_FILE"
+            else
+              cat "$RESPONSE_FILE"
+            fi
             exit 1
           fi
 
+          rm -f "$RESPONSE_FILE"
           echo "Draft uploaded to Chrome Web Store. Go to the developer dashboard to submit for review."
