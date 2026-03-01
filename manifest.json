@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Sidesy: Your Comments Sidebar For YouTube",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Bring YouTube comments to the side. Dive into the comments without scrolling past the video.",
   "content_scripts": [
     {

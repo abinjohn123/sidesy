@@ -51,6 +51,16 @@ document.addEventListener('keydown', (event) => {
 const WATCH_PAGE_PATTERN = 'youtube.com/watch';
 const ANNOUNCEMENT_TOAST_ID = 'sidesy-announcement';
 
+function isMacPlatform() {
+  const platform = navigator.userAgentData?.platform ?? navigator.platform;
+  return /Mac|iPod|iPhone|iPad/i.test(platform);
+}
+
+function getToggleShortcut() {
+  return isMacPlatform() ? '⌥\u2002+\u2002⇧\u2002+\u2002S'
+    : 'Alt\u2002+\u2002Shift\u2002+\u2002S';;
+}
+
 function isWatchPageUrl() {
   return location.href.includes(WATCH_PAGE_PATTERN);
 }
@@ -228,7 +238,10 @@ function maybeShowAnnouncement(isDark) {
 
     const list = document.createElement('ul');
     list.classList.add('sidesy-announcement-list');
-    for (const item of items) {
+    const shortcutLabel = getToggleShortcut();
+    
+    for (const rawItem of items) {
+      const item = rawItem.replace('{{TOGGLE_SHORTCUT}}', shortcutLabel);
       const li = document.createElement('li');
       const [title, ...rest] = item.split('\n');
       const titleEl = document.createElement('strong');
@@ -268,11 +281,7 @@ function activateExtension() {
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
 
-  const platform = navigator.userAgentData?.platform ?? navigator.platform;
-  const isMac = /Mac|iPod|iPhone|iPad/i.test(platform);
-  const shortcutKey = isMac
-    ? '⌥\u2002+\u2002⇧\u2002+\u2002S'
-    : 'Alt\u2002+\u2002Shift\u2002+\u2002S';
+  const shortcutKey = getToggleShortcut();
 
   const popButton = document.createElement('button');
   popButton.id = TOGGLE_BTN_ID;
