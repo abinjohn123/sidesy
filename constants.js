@@ -20,7 +20,7 @@ const CONSTANTS = {
       description: "Help spread Sidesy to more people",
       icon: "popup/icons/review.svg",
       hoverColor: "#f4b400",
-      url: "https://chromewebstore.google.com/detail/sidesy-your-comments-side/mlceikceecooilkgiikkopipedhjjech",
+      url: "https://addons.mozilla.org/en-US/firefox/addon/sidesy/",
     },
     {
       label: "Love Sidesy? Buy me a coffee",
