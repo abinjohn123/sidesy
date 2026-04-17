@@ -19,6 +19,27 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
+function getToggleShortcutInfo() {
+  return chrome.commands.getAll().then((commands) => {
+    const toggleCommand = commands.find(({ name }) => name === "toggle-sidebar");
+    const shortcut = toggleCommand?.shortcut?.trim() ?? "";
+
+    return {
+      shortcut,
+      isRegistered: shortcut.length > 0,
+    };
+  });
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "get-toggle-shortcut-info") {
+    getToggleShortcutInfo()
+      .then((shortcutInfo) => sendResponse(shortcutInfo))
+      .catch(() => sendResponse({ shortcut: "", isRegistered: false }));
+    return true;
+  }
+});
+
 /**
  * Keyboard shortcut handler.
  * Forwards the toggle-sidebar command to the active tab's content script.
