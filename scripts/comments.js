@@ -6,6 +6,12 @@ page navigation and then watch for comments to become ready.
 */
 
 const TOGGLE_BTN_ID = 'sidesy-toggle-btn';
+const MAC_SHORTCUT_ICON_URLS = {
+  command: chrome.runtime.getURL('images/shortcut-icons/cmd.svg'),
+  control: chrome.runtime.getURL('images/shortcut-icons/control.svg'),
+  option: chrome.runtime.getURL('images/shortcut-icons/option-icon.svg'),
+  shift: chrome.runtime.getURL('images/shortcut-icons/shift.svg'),
+};
 
 // State for the current navigation
 let currentObserver = null;
@@ -28,8 +34,76 @@ function isMacPlatform() {
   return /Mac|iPod|iPhone|iPad/i.test(platform);
 }
 
-function getToggleShortcut() {
-  return isMacPlatform() ? '⌥\u2002S' : 'Alt\u2002+\u2002S';
+function getDefaultShortcutLabel() {
+  return isMacPlatform() ? '⌥S' : 'Alt\u2002+\u2002S';
+}
+
+function normalizeShortcutPart(part) {
+  const normalizedPart = part.trim().toLowerCase();
+
+  if (normalizedPart === 'command' || normalizedPart === 'cmd' || normalizedPart === 'meta') {
+    return { type: 'modifier', value: 'command' };
+  }
+
+  if (normalizedPart === 'macctrl' || normalizedPart === 'ctrl' || normalizedPart === 'control') {
+    return { type: 'modifier', value: 'control' };
+  }
+
+  if (normalizedPart === 'alt' || normalizedPart === 'option') {
+    return { type: 'modifier', value: 'option' };
+  }
+
+  if (normalizedPart === 'shift') {
+    return { type: 'modifier', value: 'shift' };
+  }
+
+  return { type: 'key', value: part.trim().toUpperCase() };
+}
+
+function parseShortcut(shortcut) {
+  return shortcut
+    .split('+')
+    .map(normalizeShortcutPart)
+    .filter(({ value }) => value.length > 0);
+}
+
+function formatShortcutText(shortcut) {
+  return shortcut.replace(/\+/g, '\u2002+\u2002');
+}
+
+function createMacShortcutBadge(shortcut) {
+  const shortcutBadge = document.createElement('span');
+  shortcutBadge.classList.add('sidesy-tooltip-key', 'sidesy-tooltip-key-mac');
+
+  for (const part of parseShortcut(shortcut)) {
+    if (part.type === 'modifier') {
+      const icon = document.createElement('span');
+      icon.classList.add('sidesy-tooltip-key-icon');
+      icon.style.setProperty('--sidesy-shortcut-icon', `url("${MAC_SHORTCUT_ICON_URLS[part.value]}")`);
+      shortcutBadge.append(icon);
+      continue;
+    }
+
+    const token = document.createElement('span');
+    token.classList.add('sidesy-tooltip-key-token');
+    token.textContent = part.value;
+    shortcutBadge.append(token);
+  }
+
+  return shortcutBadge;
+}
+
+async function getToggleShortcutInfo() {
+  try {
+    return await chrome.runtime.sendMessage({
+      action: 'get-toggle-shortcut-info',
+    });
+  } catch {
+    return {
+      shortcut: '',
+      isRegistered: false,
+    };
+  }
 }
 
 function isWatchPageUrl() {
@@ -209,7 +283,7 @@ function maybeShowAnnouncement(isDark) {
 
     const list = document.createElement('ul');
     list.classList.add('sidesy-announcement-list');
-    const shortcutLabel = getToggleShortcut();
+    const shortcutLabel = getDefaultShortcutLabel();
     
     for (const rawItem of items) {
       const item = rawItem.replace('{{TOGGLE_SHORTCUT}}', shortcutLabel);
@@ -251,8 +325,6 @@ function activateExtension() {
 
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
-
-  const shortcutKey = getToggleShortcut();
 
   const popButton = document.createElement('button');
   popButton.id = TOGGLE_BTN_ID;
@@ -352,16 +424,41 @@ function activateExtension() {
     window.scrollBy({ top: delta, behavior: 'auto' });
   }
 
-  function updateTooltip(text) {
-    tooltip.innerHTML = `${text} <span class="sidesy-tooltip-key">${shortcutKey}</span>`;
+  function updateTooltip(text, shortcutInfo) {
+    tooltip.textContent = '';
+
+    const textNode = document.createElement('span');
+    textNode.textContent = text;
+    tooltip.append(textNode);
+
+    if (shortcutInfo?.isRegistered && shortcutInfo.shortcut) {
+      const shortcutBadge = isMacPlatform()
+        ? createMacShortcutBadge(shortcutInfo.shortcut)
+        : document.createElement('span');
+
+      if (!isMacPlatform()) {
+        shortcutBadge.classList.add('sidesy-tooltip-key');
+        shortcutBadge.textContent = formatShortcutText(shortcutInfo.shortcut);
+      }
+
+      tooltip.append(shortcutBadge);
+    }
+  }
+
+  function getTooltipText() {
+    return isSidebarMode() ? 'Show comments below video' : 'Show comments in sidebar';
+  }
+
+  function syncAndRenderTooltip() {
+    getToggleShortcutInfo().then((shortcutInfo) => {
+      updateTooltip(getTooltipText(), shortcutInfo);
+    });
   }
 
   function defaultView() {
     commentsEl.style.display = 'none';
     commentsEl.classList.remove('popout', 'dark-mode', 'light-mode');
     commentsEl.style.height = 'auto';
-
-    updateTooltip('Show comments in sidebar');
     iconContainer.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
         isDark ? 'stroke-light' : 'stroke-dark'
@@ -384,8 +481,6 @@ function activateExtension() {
     requestAnimationFrame(() => {
       commentsEl.style.height = `${player.offsetHeight}px`;
     });
-
-    updateTooltip('Show comments below video');
     iconContainer.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
       isDark ? 'stroke-light' : 'stroke-dark'
@@ -439,6 +534,7 @@ function activateExtension() {
     }
   });
   popButton.addEventListener('click', handleToggleClick);
+  popButton.addEventListener('mouseenter', syncAndRenderTooltip);
 
   chrome.storage.local.get(['comments_placement']).then((data) => {
     if (data.comments_placement === 'default') defaultView();
