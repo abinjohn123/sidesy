@@ -271,3 +271,134 @@
 .sidesy-announcement-list li:last-child {
   margin-bottom: 0;
 }
+
+/* Developer message */
+
+.sidesy-developer-message {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  width: min(360px, calc(100vw - 48px));
+  padding: 14px;
+  border: 1px solid var(--sidesy-developer-message-border);
+  border-radius: 8px;
+  font-family: "Roboto", "Arial", sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--sidesy-developer-message-bg);
+  color: var(--sidesy-developer-message-text);
+  box-shadow: var(--sidesy-developer-message-shadow);
+  animation: sidesy-slide-in 0.3s ease-out;
+  overflow: hidden;
+}
+
+.sidesy-developer-message::before {
+  content: "";
+  position: absolute;
+  top: -48px;
+  left: -44px;
+  width: 150px;
+  height: 120px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(248, 88, 66, 0.22) 0%, rgba(248, 88, 66, 0.12) 34%, rgba(248, 88, 66, 0) 72%);
+}
+
+.sidesy-developer-message > * {
+  position: relative;
+}
+
+.sidesy-developer-message.sidesy-slide-out {
+  animation: sidesy-slide-out 0.25s ease-in forwards;
+}
+
+.sidesy-developer-message.dark-mode {
+  --sidesy-developer-message-bg: #202124;
+  --sidesy-developer-message-border: rgba(255, 255, 255, 0.12);
+  --sidesy-developer-message-text: #f1f3f4;
+  --sidesy-developer-message-muted: #bdc1c6;
+  --sidesy-developer-message-action-bg: #f85842;
+  --sidesy-developer-message-action-text: #ffffff;
+  --sidesy-developer-message-action-hover: #e24b37;
+  --sidesy-developer-message-secondary-hover: rgba(255, 255, 255, 0.1);
+  --sidesy-developer-message-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.sidesy-developer-message.light-mode {
+  --sidesy-developer-message-bg: #ffffff;
+  --sidesy-developer-message-border: rgba(15, 15, 15, 0.12);
+  --sidesy-developer-message-text: #1f1f1f;
+  --sidesy-developer-message-muted: #5f6368;
+  --sidesy-developer-message-action-bg: #f85842;
+  --sidesy-developer-message-action-text: #ffffff;
+  --sidesy-developer-message-action-hover: #e24b37;
+  --sidesy-developer-message-secondary-hover: rgba(60, 64, 67, 0.08);
+  --sidesy-developer-message-shadow: 0 10px 26px rgba(60, 64, 67, 0.22);
+}
+
+.sidesy-developer-message-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.sidesy-developer-message-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.sidesy-developer-message-body {
+  margin: 0 0 12px;
+  color: var(--sidesy-developer-message-muted);
+}
+
+.sidesy-developer-message-body p {
+  margin: 0 0 8px;
+}
+
+.sidesy-developer-message-body p:last-child {
+  margin-bottom: 0;
+}
+
+.sidesy-developer-message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sidesy-developer-message-actions button {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sidesy-developer-message-cta {
+  border: 1px solid transparent;
+  background: var(--sidesy-developer-message-action-bg);
+  color: var(--sidesy-developer-message-action-text);
+}
+
+.sidesy-developer-message-cta:hover {
+  background: var(--sidesy-developer-message-action-hover);
+}
+
+.sidesy-developer-message-discard,
+.sidesy-developer-message-remind {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sidesy-developer-message-text);
+}
+
+.sidesy-developer-message-discard:hover,
+.sidesy-developer-message-remind:hover {
+  background: var(--sidesy-developer-message-secondary-hover);
+}

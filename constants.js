@@ -29,10 +29,37 @@ const CONSTANTS = {
       hoverColor: "#34a853",
       url: "https://buymeacoffee.com/abin.john",
     },
+    {
+      label: "Conduktor",
+      description: "Spotlight-style launcher for Chrome",
+      icon: "popup/icons/conduktor.svg",
+      hoverColor: "#f85842",
+      url: "https://chromewebstore.google.com/detail/conduktor-search-rename-g/ppemfnloahkomglmckngiioogeibdbdh",
+      sectionLabel: "Also from the developer",
+    },
   ],
   ANNOUNCEMENT: {
     items: [
       "Customise Toggle Shortcut\nThe shortcut shown in the tooltip now matches what is configured in chrome://extensions/shortcuts.",
     ],
+  },
+  DEVELOPER_MESSAGE: {
+    enabled: true,
+    id: "conduktor-2026-05",
+    title: "Hi, it's Abin from Sidesy",
+    bodyParagraphs: [
+      "I just launched a new extension called Conduktor, a Spotlight-style launcher for Chrome.",
+      "Search tabs, manage tab groups, and run browser actions without leaving the keyboard. Built for keyboard-first users, productivity geeks, and tab hoarders.",
+      "Free for 30 days, no credit card needed. 🙂",
+    ],
+    ctaLabel: "Check it out",
+    remindLabel: "Remind later",
+    dismissLabel: "Discard",
+    url: "https://chromewebstore.google.com/detail/conduktor-search-rename-g/ppemfnloahkomglmckngiioogeibdbdh",
+    existingUserDelayDays: 3,
+    newUserDelayDays: 14,
+    remindLaterDays: 14,
+    maxReminders: 1,
+    showDelayMs: 6500,
   },
 };

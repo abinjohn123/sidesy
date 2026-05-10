@@ -28,6 +28,8 @@ chrome.runtime.onMessage.addListener((message) => {
 
 const WATCH_PAGE_PATTERN = 'youtube.com/watch';
 const ANNOUNCEMENT_TOAST_ID = 'sidesy-announcement';
+const DEVELOPER_MESSAGE_TOAST_ID = 'sidesy-developer-message';
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function isMacPlatform() {
   const platform = navigator.userAgentData?.platform ?? navigator.platform;
@@ -113,6 +115,11 @@ function isWatchPageUrl() {
 function removeAnnouncementToast() {
   const banner = document.getElementById(ANNOUNCEMENT_TOAST_ID);
   if (banner) banner.remove();
+}
+
+function removeDeveloperMessageToast() {
+  const toast = document.getElementById(DEVELOPER_MESSAGE_TOAST_ID);
+  if (toast) toast.remove();
 }
 
 function cleanup() {
@@ -201,6 +208,7 @@ function onNavigate() {
 
   if (!isWatchPage) {
     removeAnnouncementToast();
+    removeDeveloperMessageToast();
     return;
   }
 
@@ -303,6 +311,176 @@ function maybeShowAnnouncement(isDark) {
 
     document.body.append(banner);
   });
+}
+
+function getDeveloperMessageConfig() {
+  const config = CONSTANTS.DEVELOPER_MESSAGE;
+  if (!config?.enabled) return null;
+  if (!config.id || !config.title || !config.url) return null;
+  if (!Array.isArray(config.bodyParagraphs) || config.bodyParagraphs.length === 0) {
+    return null;
+  }
+  if (!Number.isFinite(config.existingUserDelayDays)) return null;
+  if (!Number.isFinite(config.newUserDelayDays)) return null;
+  if (!Number.isFinite(config.remindLaterDays)) return null;
+  if (!Number.isFinite(config.maxReminders)) return null;
+  if (!Number.isFinite(config.showDelayMs)) return null;
+  return config;
+}
+
+function createDeveloperMessageState(config, now) {
+  return {
+    campaignId: config.id,
+    firstSeenAt: now,
+    dismissedAt: null,
+    clickedAt: null,
+    remindAfter: null,
+    reminderCount: 0,
+  };
+}
+
+function getDeveloperMessageState(config, rawState, now) {
+  if (rawState?.campaignId === config.id && Number.isFinite(rawState.firstSeenAt)) {
+    return rawState;
+  }
+
+  return createDeveloperMessageState(config, now);
+}
+
+function isDeveloperMessageEligible(config, state, installedAt, pendingAnnouncement, now) {
+  if (pendingAnnouncement) return false;
+  if (state.dismissedAt || state.clickedAt) return false;
+  if (state.remindAfter && now < state.remindAfter) return false;
+
+  const installTime = Number(installedAt);
+  const delayDays = Number.isFinite(installTime)
+    ? config.newUserDelayDays
+    : config.existingUserDelayDays;
+  const baseTime = Number.isFinite(installTime) ? installTime : state.firstSeenAt;
+  const eligibleAt = baseTime + delayDays * DAY_MS;
+
+  return now >= eligibleAt;
+}
+
+function dismissDeveloperMessage(toast, state, extraState = {}) {
+  chrome.storage.local.set({
+    developer_message_state: {
+      ...state,
+      ...extraState,
+    },
+  });
+
+  toast.classList.add('sidesy-slide-out');
+  toast.addEventListener('animationend', () => toast.remove(), { once: true });
+}
+
+function renderDeveloperMessage(isDark, config, state) {
+  if (!isWatchPageUrl()) return;
+  if (document.getElementById(DEVELOPER_MESSAGE_TOAST_ID)) return;
+  if (document.getElementById(ANNOUNCEMENT_TOAST_ID)) return;
+
+  const toast = document.createElement('div');
+  toast.id = DEVELOPER_MESSAGE_TOAST_ID;
+  toast.classList.add('sidesy-developer-message', isDark ? 'dark-mode' : 'light-mode');
+
+  const titleRow = document.createElement('div');
+  titleRow.classList.add('sidesy-developer-message-title');
+
+  const icon = document.createElement('img');
+  icon.src = chrome.runtime.getURL('images/sidesy-128.png');
+  icon.classList.add('sidesy-developer-message-icon');
+
+  const titleText = document.createElement('span');
+  titleText.textContent = config.title;
+
+  titleRow.append(icon, titleText);
+
+  const body = document.createElement('div');
+  body.classList.add('sidesy-developer-message-body');
+
+  config.bodyParagraphs.forEach((paragraph) => {
+    const text = String(paragraph).trim();
+    if (!text) return;
+
+    const bodyParagraph = document.createElement('p');
+    bodyParagraph.textContent = text;
+    body.append(bodyParagraph);
+  });
+
+  const actions = document.createElement('div');
+  actions.classList.add('sidesy-developer-message-actions');
+
+  const discard = document.createElement('button');
+  discard.classList.add('sidesy-developer-message-discard');
+  discard.textContent = config.dismissLabel;
+  discard.addEventListener('click', () => {
+    dismissDeveloperMessage(toast, state, { dismissedAt: Date.now() });
+  });
+  actions.append(discard);
+
+  const cta = document.createElement('button');
+  cta.classList.add('sidesy-developer-message-cta');
+  cta.textContent = config.ctaLabel;
+  cta.addEventListener('click', () => {
+    dismissDeveloperMessage(toast, state, { clickedAt: Date.now() });
+    window.open(config.url, '_blank', 'noopener,noreferrer');
+  });
+
+  const canRemindLater = (state.reminderCount || 0) < config.maxReminders;
+  if (canRemindLater) {
+    const remind = document.createElement('button');
+    remind.classList.add('sidesy-developer-message-remind');
+    remind.textContent = config.remindLabel;
+    remind.addEventListener('click', () => {
+      const now = Date.now();
+      dismissDeveloperMessage(toast, state, {
+        remindAfter: now + config.remindLaterDays * DAY_MS,
+        reminderCount: (state.reminderCount || 0) + 1,
+      });
+    });
+    actions.append(remind);
+  }
+
+  actions.append(cta);
+
+  toast.append(titleRow, body, actions);
+  document.body.append(toast);
+}
+
+function maybeShowDeveloperMessage(isDark) {
+  const config = getDeveloperMessageConfig();
+  if (!config || !isWatchPageUrl()) return;
+
+  window.setTimeout(() => {
+    if (!isWatchPageUrl()) return;
+
+    chrome.storage.local.get([
+      'developer_message_state',
+      'extension_installed_at',
+      'pending_announcement',
+    ]).then((data) => {
+      if (!isWatchPageUrl()) return;
+
+      const now = Date.now();
+      const state = getDeveloperMessageState(config, data.developer_message_state, now);
+
+      if (state !== data.developer_message_state) {
+        chrome.storage.local.set({ developer_message_state: state });
+      }
+
+      if (!isDeveloperMessageEligible(
+        config,
+        state,
+        data.extension_installed_at,
+        data.pending_announcement,
+        now
+      )) {
+        return;
+      }
+
+      renderDeveloperMessage(isDark, config, state);
+    }).catch(() => {});
+  }, config.showDelayMs);
 }
 
 /*
@@ -542,4 +720,5 @@ function activateExtension() {
   });
 
   maybeShowAnnouncement(isDark);
+  maybeShowDeveloperMessage(isDark);
 }

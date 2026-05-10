@@ -1,7 +1,14 @@
 document.addEventListener("DOMContentLoaded", () => {
   const menu = document.getElementById("popup-menu");
 
-  CONSTANTS.POPUP_LINKS.forEach(({ label, description, icon, hoverColor, url }) => {
+  CONSTANTS.POPUP_LINKS.forEach(({ label, description, icon, hoverColor, url, sectionLabel }) => {
+    if (sectionLabel) {
+      const section = document.createElement("span");
+      section.className = "popup-section-label";
+      section.textContent = sectionLabel;
+      menu.appendChild(section);
+    }
+
     const link = document.createElement("a");
     link.href = url;
     link.target = "_blank";
