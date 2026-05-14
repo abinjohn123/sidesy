@@ -35,7 +35,15 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.storage.local.set({ extension_updated_at: now });
     chrome.storage.local.get(["last_seen_announcement"]).then((data) => {
       const hasItems = CONSTANTS.ANNOUNCEMENT.items.length > 0;
-      if (hasItems && data.last_seen_announcement !== version) {
+      if (!hasItems) {
+        chrome.storage.local.set({
+          last_seen_announcement: version,
+          pending_announcement: null,
+        });
+        return;
+      }
+
+      if (data.last_seen_announcement !== version) {
         chrome.storage.local.set({ pending_announcement: version });
       }
     });
