@@ -39,9 +39,7 @@ const CONSTANTS = {
     },
   ],
   ANNOUNCEMENT: {
-    items: [
-      "Customise Toggle Shortcut\nThe shortcut shown in the tooltip now matches what is configured in chrome://extensions/shortcuts.",
-    ],
+    items: [],
   },
   DEVELOPER_MESSAGE: {
     enabled: true,
