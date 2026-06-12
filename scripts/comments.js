@@ -131,8 +131,12 @@ function isWatchPageUrl() {
 function isEditableTarget(target) {
   if (!(target instanceof Element)) return false;
 
+  if (target.closest('input, textarea, select')) return true;
+
+  const contentEditable = target.closest('[contenteditable]');
   return Boolean(
-    target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+    contentEditable &&
+    contentEditable.getAttribute('contenteditable')?.toLowerCase() !== 'false'
   );
 }
 
