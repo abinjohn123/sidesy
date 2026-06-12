@@ -39,7 +39,9 @@ const CONSTANTS = {
     },
   ],
   ANNOUNCEMENT: {
-    items: [],
+    items: [
+      "Expandable sidebar comments\nYou can now expand comments to full height from the new header button, or by pressing Z when comments are on the side. The extra height fits more comments at once, especially on smaller screens. Thanks to everyone who asked for this!",
+    ],
   },
   DEVELOPER_MESSAGE: {
     enabled: true,
