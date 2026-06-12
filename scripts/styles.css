@@ -23,9 +23,14 @@
   box-sizing: border-box;
   overflow-y: scroll;
   width: 100%;
-  padding: 0 16px;
+  padding: 0 16px 24px;
   margin-bottom: 24px;
   border-radius: 12px;
+}
+
+.sidesy-comments-shell {
+  position: relative;
+  display: flow-root;
 }
 
 .popout::-webkit-scrollbar {
@@ -69,6 +74,34 @@
 
 .comments-header-btn:hover {
   opacity: 1;
+}
+
+.sidesy-expand-comments-btn {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 1000;
+  transform: translate(-50%, 50%);
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(96, 96, 96, 0.92);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.sidesy-expand-comments-btn:hover {
+  background: rgba(64, 64, 64, 0.95);
+}
+
+.sidesy-expand-comments-btn[hidden] {
+  display: none;
 }
 
 .comments-icon {
