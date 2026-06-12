@@ -6,6 +6,9 @@ page navigation and then watch for comments to become ready.
 */
 
 const TOGGLE_BTN_ID = 'sidesy-toggle-btn';
+const EXPAND_COMMENTS_BTN_ID = 'sidesy-expand-comments-btn';
+const SIDEBAR_BOTTOM_PADDING = 24;
+const SIDEBAR_MIN_EXPANDED_HEIGHT = 240;
 const MAC_SHORTCUT_ICON_URLS = {
   command: chrome.runtime.getURL('images/shortcut-icons/cmd.svg'),
   control: chrome.runtime.getURL('images/shortcut-icons/control.svg'),
@@ -16,6 +19,7 @@ const MAC_SHORTCUT_ICON_URLS = {
 // State for the current navigation
 let currentObserver = null;
 let currentInterval = null;
+let activeExtensionCleanup = null;
 let activated = false;
 
 // Listen for keyboard shortcut messages from the background script
@@ -131,6 +135,10 @@ function cleanup() {
     clearInterval(currentInterval);
     currentInterval = null;
   }
+  if (activeExtensionCleanup) {
+    activeExtensionCleanup();
+    activeExtensionCleanup = null;
+  }
   activated = false;
 }
 
@@ -236,6 +244,10 @@ Save current extension position locally
 
 function savePosition(position) {
   chrome.storage.local.set({ comments_placement: position });
+}
+
+function saveSidebarExpanded(isExpanded) {
+  chrome.storage.local.set({ sidebar_comments_expanded: isExpanded });
 }
 
 /*
@@ -515,8 +527,68 @@ function activateExtension() {
   tooltip.classList.add('sidesy-tooltip');
   popButton.appendChild(tooltip);
 
+  const expandCommentsButton = document.createElement('button');
+  expandCommentsButton.id = EXPAND_COMMENTS_BTN_ID;
+  expandCommentsButton.classList.add('sidesy-expand-comments-btn');
+  expandCommentsButton.type = 'button';
+
+  const commentsShell = document.createElement('div');
+  commentsShell.classList.add('sidesy-comments-shell');
+  commentsShell.append(expandCommentsButton);
+
+  let isSidebarExpanded = false;
+
   function isSidebarMode() {
     return commentsEl.classList.contains('popout');
+  }
+
+  function getYouTubeHeaderBottom() {
+    const header = document.querySelector('#masthead-container');
+    if (!header) return 0;
+
+    return Math.max(0, header.getBoundingClientRect().bottom);
+  }
+
+  function getSidebarContentAboveHeight() {
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const shellRect = commentsShell.getBoundingClientRect();
+    return Math.max(0, shellRect.top - sidebarRect.top);
+  }
+
+  function getSidebarHeight() {
+    if (!isSidebarExpanded) return player.offsetHeight;
+
+    const expandedHeight = (
+      window.innerHeight -
+      getYouTubeHeaderBottom() -
+      getSidebarContentAboveHeight() -
+      SIDEBAR_BOTTOM_PADDING
+    );
+
+    return Math.max(SIDEBAR_MIN_EXPANDED_HEIGHT, expandedHeight);
+  }
+
+  function updateExpandCommentsButton() {
+    const isVisible = isSidebarMode();
+    expandCommentsButton.hidden = !isVisible;
+    expandCommentsButton.setAttribute('aria-expanded', String(isSidebarExpanded));
+
+    if (!isVisible) return;
+
+    expandCommentsButton.textContent = isSidebarExpanded ? 'Collapse' : 'Expand';
+    expandCommentsButton.title = isSidebarExpanded ? 'Collapse comments' : 'Expand comments';
+  }
+
+  function syncSidebarHeight() {
+    if (!isSidebarMode()) return;
+
+    commentsEl.style.height = `${getSidebarHeight()}px`;
+    updateExpandCommentsButton();
+  }
+
+  function syncSidebarHeightWithNextFrame() {
+    syncSidebarHeight();
+    requestAnimationFrame(syncSidebarHeight);
   }
 
   function getActiveViewport(mode) {
@@ -637,6 +709,7 @@ function activateExtension() {
     commentsEl.style.display = 'none';
     commentsEl.classList.remove('popout', 'dark-mode', 'light-mode');
     commentsEl.style.height = 'auto';
+    updateExpandCommentsButton();
     iconContainer.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
         isDark ? 'stroke-light' : 'stroke-dark'
@@ -645,6 +718,7 @@ function activateExtension() {
       </svg>`;
 
     originalCommentsContainer.append(commentsEl);
+    commentsShell.remove();
     commentsEl.style.display = 'block';
 
     savePosition('default');
@@ -655,10 +729,6 @@ function activateExtension() {
       videoSizeButton.click();
     }
     commentsEl.classList.add('popout', isDark ? 'dark-mode' : 'light-mode');
-    commentsEl.style.height = `${player.offsetHeight}px`;
-    requestAnimationFrame(() => {
-      commentsEl.style.height = `${player.offsetHeight}px`;
-    });
     iconContainer.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
       isDark ? 'stroke-light' : 'stroke-dark'
@@ -666,7 +736,9 @@ function activateExtension() {
       <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 9l-3 3m0 0l3 3m-3-3h7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>`;
 
-    sidebar.prepend(commentsEl);
+    commentsShell.prepend(commentsEl);
+    sidebar.prepend(commentsShell);
+    syncSidebarHeightWithNextFrame();
 
     savePosition('sidebar');
   }
@@ -697,6 +769,12 @@ function activateExtension() {
     switchMode(isSidebarMode() ? 'default' : 'sidebar');
   }
 
+  function handleExpandCommentsClick() {
+    isSidebarExpanded = !isSidebarExpanded;
+    syncSidebarHeight();
+    saveSidebarExpanded(isSidebarExpanded);
+  }
+
   if (!commentsEl.querySelector('header')) {
     const header = document.createElement('header');
     header.classList.add('comments-header');
@@ -713,8 +791,19 @@ function activateExtension() {
   });
   popButton.addEventListener('click', handleToggleClick);
   popButton.addEventListener('mouseenter', syncAndRenderTooltip);
+  expandCommentsButton.addEventListener('click', handleExpandCommentsClick);
+  window.addEventListener('resize', syncSidebarHeight);
+  activeExtensionCleanup = () => {
+    if (commentsShell.contains(commentsEl)) {
+      commentsShell.before(commentsEl);
+    }
+    commentsShell.remove();
+    window.removeEventListener('resize', syncSidebarHeight);
+  };
 
-  chrome.storage.local.get(['comments_placement']).then((data) => {
+  chrome.storage.local.get(['comments_placement', 'sidebar_comments_expanded']).then((data) => {
+    isSidebarExpanded = data.sidebar_comments_expanded === true;
+
     if (data.comments_placement === 'default') defaultView();
     else sidebarView();
   });
