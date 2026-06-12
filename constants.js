@@ -48,7 +48,7 @@ const CONSTANTS = {
     bodyParagraphs: [
       "I just launched a new extension called Conduktor, a Spotlight-style launcher for Chrome.",
       "Search tabs, manage tab groups, and run browser actions without leaving the keyboard. Built for keyboard-first users, productivity geeks, and tab hoarders.",
-      "Free for 30 days, no credit card needed. 🙂",
+      "Free to start. No account or credit card needed. 🙂",
     ],
     ctaLabel: "Check it out",
     remindLabel: "Remind later",
