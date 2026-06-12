@@ -7,6 +7,7 @@ page navigation and then watch for comments to become ready.
 
 const TOGGLE_BTN_ID = 'sidesy-toggle-btn';
 const EXPAND_COMMENTS_BTN_ID = 'sidesy-expand-comments-btn';
+const EXPAND_COMMENTS_SHORTCUT = 'Z';
 const SIDEBAR_BOTTOM_PADDING = 24;
 const SIDEBAR_MIN_EXPANDED_HEIGHT = 240;
 const MAC_SHORTCUT_ICON_URLS = {
@@ -99,6 +100,17 @@ function createMacShortcutBadge(shortcut) {
   return shortcutBadge;
 }
 
+function createShortcutBadge(shortcut) {
+  if (isMacPlatform()) {
+    return createMacShortcutBadge(shortcut);
+  }
+
+  const shortcutBadge = document.createElement('span');
+  shortcutBadge.classList.add('sidesy-tooltip-key');
+  shortcutBadge.textContent = formatShortcutText(shortcut);
+  return shortcutBadge;
+}
+
 async function getToggleShortcutInfo() {
   try {
     return await chrome.runtime.sendMessage({
@@ -114,6 +126,14 @@ async function getToggleShortcutInfo() {
 
 function isWatchPageUrl() {
   return location.href.includes(WATCH_PAGE_PATTERN);
+}
+
+function isEditableTarget(target) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+  );
 }
 
 function removeAnnouncementToast() {
@@ -586,7 +606,10 @@ function activateExtension() {
 
     const label = isSidebarExpanded ? 'Collapse comments section' : 'Expand comments section';
     expandCommentsIcon.innerHTML = getExpandCommentsIconSvg();
-    expandCommentsTooltip.textContent = label;
+    expandCommentsTooltip.textContent = '';
+    const textNode = document.createElement('span');
+    textNode.textContent = label;
+    expandCommentsTooltip.append(textNode, createShortcutBadge(EXPAND_COMMENTS_SHORTCUT));
     expandCommentsButton.setAttribute('aria-label', label);
   }
 
@@ -726,16 +749,7 @@ function activateExtension() {
     tooltip.append(textNode);
 
     if (shortcutInfo?.isRegistered && shortcutInfo.shortcut) {
-      const shortcutBadge = isMacPlatform()
-        ? createMacShortcutBadge(shortcutInfo.shortcut)
-        : document.createElement('span');
-
-      if (!isMacPlatform()) {
-        shortcutBadge.classList.add('sidesy-tooltip-key');
-        shortcutBadge.textContent = formatShortcutText(shortcutInfo.shortcut);
-      }
-
-      tooltip.append(shortcutBadge);
+      tooltip.append(createShortcutBadge(shortcutInfo.shortcut));
     }
   }
 
@@ -819,6 +833,16 @@ function activateExtension() {
     saveSidebarExpanded(isSidebarExpanded);
   }
 
+  function handleExpandCommentsKeydown(event) {
+    if (event.defaultPrevented || event.repeat) return;
+    if (event.key.toLowerCase() !== 'z') return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (!isSidebarMode() || isEditableTarget(event.target)) return;
+
+    event.preventDefault();
+    handleExpandCommentsClick();
+  }
+
   const header = document.createElement('header');
   header.classList.add('comments-header');
   header.append(expandCommentsButton, popButton);
@@ -834,12 +858,14 @@ function activateExtension() {
   popButton.addEventListener('click', handleToggleClick);
   popButton.addEventListener('mouseenter', syncAndRenderTooltip);
   expandCommentsButton.addEventListener('click', handleExpandCommentsClick);
+  document.addEventListener('keydown', handleExpandCommentsKeydown);
   window.addEventListener('resize', syncSidebarHeight);
   activeExtensionCleanup = () => {
     if (sidebarHeightAnimationTimeout) {
       clearTimeout(sidebarHeightAnimationTimeout);
       sidebarHeightAnimationTimeout = null;
     }
+    document.removeEventListener('keydown', handleExpandCommentsKeydown);
     window.removeEventListener('resize', syncSidebarHeight);
   };
 
