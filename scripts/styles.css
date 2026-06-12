@@ -36,11 +36,6 @@
   transition: height 210ms cubic-bezier(0.34, 1.35, 0.64, 1);
 }
 
-.sidesy-comments-shell {
-  position: relative;
-  display: flow-root;
-}
-
 .popout::-webkit-scrollbar {
   /* display: none; */
   width: 8px;

@@ -544,9 +544,6 @@ function activateExtension() {
   expandCommentsTooltip.classList.add('sidesy-tooltip');
   expandCommentsButton.appendChild(expandCommentsTooltip);
 
-  const commentsShell = document.createElement('div');
-  commentsShell.classList.add('sidesy-comments-shell');
-
   let isSidebarExpanded = false;
   let sidebarHeightAnimationTimeout = null;
 
@@ -563,8 +560,8 @@ function activateExtension() {
 
   function getSidebarContentAboveHeight() {
     const sidebarRect = sidebar.getBoundingClientRect();
-    const shellRect = commentsShell.getBoundingClientRect();
-    return Math.max(0, shellRect.top - sidebarRect.top);
+    const commentsRect = commentsEl.getBoundingClientRect();
+    return Math.max(0, commentsRect.top - sidebarRect.top);
   }
 
   function getSidebarHeight() {
@@ -765,7 +762,6 @@ function activateExtension() {
       </svg>`;
 
     originalCommentsContainer.append(commentsEl);
-    commentsShell.remove();
     commentsEl.style.display = 'block';
 
     savePosition('default');
@@ -783,8 +779,7 @@ function activateExtension() {
       <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 9l-3 3m0 0l3 3m-3-3h7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>`;
 
-    commentsShell.prepend(commentsEl);
-    sidebar.prepend(commentsShell);
+    sidebar.prepend(commentsEl);
     syncSidebarHeightWithNextFrame();
 
     savePosition('sidebar');
@@ -845,10 +840,6 @@ function activateExtension() {
       clearTimeout(sidebarHeightAnimationTimeout);
       sidebarHeightAnimationTimeout = null;
     }
-    if (commentsShell.contains(commentsEl)) {
-      commentsShell.before(commentsEl);
-    }
-    commentsShell.remove();
     window.removeEventListener('resize', syncSidebarHeight);
   };
 
