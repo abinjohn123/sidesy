@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sidesy: Your Comments Sidebar For YouTube",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Bring YouTube comments to the side. Dive into the comments without scrolling past the video.",
   "content_scripts": [
     {
@@ -24,12 +24,15 @@
     }
   },
   "background": {
-    "service_worker": "background.js"
+    "scripts": [
+      "constants.js",
+      "background.js"
+    ]
   },
   "commands": {
     "toggle-sidebar": {
       "suggested_key": {
-        "default": "Alt+S"
+        "default": "Alt+Shift+S"
       },
       "description": "Toggle comments sidebar"
     }
@@ -54,5 +57,10 @@
         "https://www.youtube.com/*"
       ]
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "strict_min_version": "121.0"
+    }
+  }
 }

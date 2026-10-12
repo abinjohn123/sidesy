@@ -1,4 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
+  // Firefox port: `browser` with `chrome` fallback.
+  const ext = globalThis.browser ?? globalThis.chrome;
+  const COLLAPSE_DEFAULT_KEY = "sidesy_collapse_by_default";
   const menu = document.getElementById("popup-menu");
 
   CONSTANTS.POPUP_LINKS.forEach(({ label, description, icon, hoverColor, url, sectionLabel }) => {
@@ -19,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
     iconContainer.className = "link-icon";
 
     // Fetch SVG and inject inline so CSS can color the strokes
-    fetch(chrome.runtime.getURL(icon))
+    fetch(ext.runtime.getURL(icon))
       .then((res) => res.text())
       .then((svgText) => {
         iconContainer.innerHTML = svgText;
@@ -53,6 +56,44 @@ document.addEventListener("DOMContentLoaded", () => {
   // Pull version dynamically from manifest
   const versionEl = document.getElementById("popup-version");
   if (versionEl) {
-    versionEl.textContent = "v" + chrome.runtime.getManifest().version;
+    versionEl.textContent = "v" + ext.runtime.getManifest().version;
+  }
+
+  // Animated settings page (menu ⇄ settings slide)
+  const settingsBtn = document.getElementById("popup-settings-btn");
+  const backBtn = document.getElementById("popup-back-btn");
+  const collapseToggle = document.getElementById("collapse-default-toggle");
+
+  function openSettings() {
+    document.body.classList.add("settings-open");
+    settingsBtn?.setAttribute("aria-expanded", "true");
+  }
+
+  function closeSettings() {
+    document.body.classList.remove("settings-open");
+    settingsBtn?.setAttribute("aria-expanded", "false");
+  }
+
+  settingsBtn?.addEventListener("click", () => {
+    if (document.body.classList.contains("settings-open")) closeSettings();
+    else openSettings();
+  });
+  backBtn?.addEventListener("click", closeSettings);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("settings-open")) {
+      closeSettings();
+    }
+  });
+
+  // "Collapse comments by default" preference — read by the content script on
+  // each new video to decide whether the sidebar starts collapsed.
+  if (collapseToggle) {
+    ext.storage.local.get([COLLAPSE_DEFAULT_KEY]).then((data) => {
+      collapseToggle.checked = data[COLLAPSE_DEFAULT_KEY] === true;
+    }).catch(() => {});
+
+    collapseToggle.addEventListener("change", () => {
+      ext.storage.local.set({ [COLLAPSE_DEFAULT_KEY]: collapseToggle.checked }).catch(() => {});
+    });
   }
 });

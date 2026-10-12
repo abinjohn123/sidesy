@@ -8,13 +8,20 @@ page navigation and then watch for comments to become ready.
 const TOGGLE_BTN_ID = 'sidesy-toggle-btn';
 const EXPAND_COMMENTS_BTN_ID = 'sidesy-expand-comments-btn';
 const EXPAND_COMMENTS_SHORTCUT = 'Z';
+const COLLAPSE_COMMENTS_BTN_ID = 'sidesy-collapse-comments-btn';
+const COLLAPSE_COMMENTS_SHORTCUT = 'X';
+const SIDESY_COLLAPSED_HEIGHT = 104;
+const COLLAPSE_DEFAULT_STORAGE_KEY = 'sidesy_collapse_by_default';
+const COLLAPSED_STATE_STORAGE_KEY = 'sidebar_comments_collapsed';
 const SIDEBAR_BOTTOM_PADDING = 24;
 const SIDEBAR_MIN_EXPANDED_HEIGHT = 240;
+// Firefox port: `browser` (promise-based) with `chrome` fallback.
+const ext = globalThis.browser ?? globalThis.chrome;
 const MAC_SHORTCUT_ICON_URLS = {
-  command: chrome.runtime.getURL('images/shortcut-icons/cmd.svg'),
-  control: chrome.runtime.getURL('images/shortcut-icons/control.svg'),
-  option: chrome.runtime.getURL('images/shortcut-icons/option-icon.svg'),
-  shift: chrome.runtime.getURL('images/shortcut-icons/shift.svg'),
+  command: ext.runtime.getURL('images/shortcut-icons/cmd.svg'),
+  control: ext.runtime.getURL('images/shortcut-icons/control.svg'),
+  option: ext.runtime.getURL('images/shortcut-icons/option-icon.svg'),
+  shift: ext.runtime.getURL('images/shortcut-icons/shift.svg'),
 };
 
 // State for the current navigation
@@ -24,11 +31,32 @@ let activeExtensionCleanup = null;
 let activated = false;
 
 // Listen for keyboard shortcut messages from the background script
-chrome.runtime.onMessage.addListener((message) => {
+let lastSidebarToggleAt = 0;
+function triggerSidebarToggle() {
+  // Debounce: the native `commands` message and the in-page fallback below
+  // can both fire for one keypress in Firefox — ignore the duplicate.
+  const now = Date.now();
+  if (now - lastSidebarToggleAt < 400) return;
+  lastSidebarToggleAt = now;
+  const popButton = document.getElementById(TOGGLE_BTN_ID);
+  if (popButton) popButton.click();
+}
+ext.runtime.onMessage.addListener((message) => {
   if (message.action === 'toggle-sidebar') {
-    const popButton = document.getElementById(TOGGLE_BTN_ID);
-    if (popButton) popButton.click();
+    triggerSidebarToggle();
   }
+});
+
+// Firefox port: in-page fallback for Alt+Shift+S (and Alt+S for users coming
+// from Chrome). Firefox does not always deliver `commands` to the active tab
+// (e.g. customized/unbound shortcut), so handle it locally too.
+document.addEventListener('keydown', (event) => {
+  if (event.defaultPrevented || event.repeat) return;
+  if (!event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.code !== 'KeyS') return;
+  if (isEditableTarget(event.target)) return;
+  event.preventDefault();
+  triggerSidebarToggle();
 });
 
 const WATCH_PAGE_PATTERN = 'youtube.com/watch';
@@ -113,7 +141,7 @@ function createShortcutBadge(shortcut) {
 
 async function getToggleShortcutInfo() {
   try {
-    return await chrome.runtime.sendMessage({
+    return await ext.runtime.sendMessage({
       action: 'get-toggle-shortcut-info',
     });
   } catch {
@@ -267,11 +295,11 @@ Save current extension position locally
 */
 
 function savePosition(position) {
-  chrome.storage.local.set({ comments_placement: position });
+  ext.storage.local.set({ comments_placement: position });
 }
 
 function saveSidebarExpanded(isExpanded) {
-  chrome.storage.local.set({ sidebar_comments_expanded: isExpanded });
+  ext.storage.local.set({ sidebar_comments_expanded: isExpanded });
 }
 
 /*
@@ -281,7 +309,7 @@ if there is a pending announcement in storage.
 function maybeShowAnnouncement(isDark) {
   if (!isWatchPageUrl()) return;
 
-  chrome.storage.local.get(["pending_announcement"]).then((data) => {
+  ext.storage.local.get(["pending_announcement"]).then((data) => {
     if (!isWatchPageUrl()) return;
 
     const version = data.pending_announcement;
@@ -301,7 +329,7 @@ function maybeShowAnnouncement(isDark) {
     titleRow.classList.add('sidesy-announcement-title');
 
     const icon = document.createElement('img');
-    icon.src = chrome.runtime.getURL('images/sidesy-128.png');
+    icon.src = ext.runtime.getURL('images/sidesy-128.png');
     icon.classList.add('sidesy-announcement-icon');
 
     const heading = document.createElement('span');
@@ -311,11 +339,11 @@ function maybeShowAnnouncement(isDark) {
     dismissBtn.classList.add('sidesy-announcement-dismiss');
     dismissBtn.setAttribute('aria-label', 'Dismiss announcement');
     const dismissIcon = document.createElement('img');
-    dismissIcon.src = chrome.runtime.getURL('images/close.svg');
+    dismissIcon.src = ext.runtime.getURL('images/close.svg');
     dismissIcon.classList.add('sidesy-announcement-dismiss-icon');
     dismissBtn.append(dismissIcon);
     dismissBtn.addEventListener('click', () => {
-      chrome.storage.local.set({
+      ext.storage.local.set({
         last_seen_announcement: version,
         pending_announcement: null,
       });
@@ -399,7 +427,7 @@ function isDeveloperMessageEligible(config, state, installedAt, pendingAnnouncem
 }
 
 function dismissDeveloperMessage(toast, state, extraState = {}) {
-  chrome.storage.local.set({
+  ext.storage.local.set({
     developer_message_state: {
       ...state,
       ...extraState,
@@ -423,7 +451,7 @@ function renderDeveloperMessage(isDark, config, state) {
   titleRow.classList.add('sidesy-developer-message-title');
 
   const icon = document.createElement('img');
-  icon.src = chrome.runtime.getURL('images/sidesy-128.png');
+  icon.src = ext.runtime.getURL('images/sidesy-128.png');
   icon.classList.add('sidesy-developer-message-icon');
 
   const titleText = document.createElement('span');
@@ -490,7 +518,7 @@ function maybeShowDeveloperMessage(isDark) {
   window.setTimeout(() => {
     if (!isWatchPageUrl()) return;
 
-    chrome.storage.local.get([
+    ext.storage.local.get([
       'developer_message_state',
       'extension_installed_at',
       'pending_announcement',
@@ -501,7 +529,7 @@ function maybeShowDeveloperMessage(isDark) {
       const state = getDeveloperMessageState(config, data.developer_message_state, now);
 
       if (state !== data.developer_message_state) {
-        chrome.storage.local.set({ developer_message_state: state });
+        ext.storage.local.set({ developer_message_state: state });
       }
 
       if (!isDeveloperMessageEligible(
@@ -542,6 +570,11 @@ function activateExtension() {
 
   const existingHeader = commentsEl.querySelector(':scope > .comments-header');
   if (existingHeader) existingHeader.remove();
+  // Drop any stale collapsed placeholder from a previous navigation: its
+  // click listener closes over the old activation's setCommentsCollapsed.
+  const staleNotice = commentsEl.querySelector(':scope > .sidesy-collapsed-notice');
+  if (staleNotice) staleNotice.remove();
+  commentsEl.classList.remove('sidesy-collapsed');
 
   const popButton = document.createElement('button');
   popButton.id = TOGGLE_BTN_ID;
@@ -568,8 +601,23 @@ function activateExtension() {
   expandCommentsTooltip.classList.add('sidesy-tooltip');
   expandCommentsButton.appendChild(expandCommentsTooltip);
 
+  const collapseCommentsButton = document.createElement('button');
+  collapseCommentsButton.id = COLLAPSE_COMMENTS_BTN_ID;
+  collapseCommentsButton.classList.add('comments-header-btn', 'sidesy-collapse-comments-btn');
+  collapseCommentsButton.type = 'button';
+
+  const collapseCommentsIcon = document.createElement('span');
+  collapseCommentsIcon.classList.add('sidesy-collapse-comments-icon');
+  collapseCommentsButton.appendChild(collapseCommentsIcon);
+
+  const collapseCommentsTooltip = document.createElement('span');
+  collapseCommentsTooltip.classList.add('sidesy-tooltip');
+  collapseCommentsButton.appendChild(collapseCommentsTooltip);
+
   let isSidebarExpanded = false;
   let sidebarHeightAnimationTimeout = null;
+  let isCommentsCollapsed = false;
+  let collapseByDefault = false;
 
   function isSidebarMode() {
     return commentsEl.classList.contains('popout');
@@ -602,11 +650,15 @@ function activateExtension() {
   }
 
   function updateExpandCommentsButton() {
-    const isVisible = isSidebarMode();
-    expandCommentsButton.hidden = !isVisible;
+    const inSidebar = isSidebarMode();
+    expandCommentsButton.hidden = !inSidebar;
+    // When X-collapsed, park the Z button with visibility (not display) so
+    // the collapse + toggle buttons never shift position.
+    const parked = inSidebar && isCommentsCollapsed;
+    expandCommentsButton.classList.toggle('sidesy-btn-parked', parked);
     expandCommentsButton.setAttribute('aria-expanded', String(isSidebarExpanded));
 
-    if (!isVisible) return;
+    if (!inSidebar) return;
 
     const label = isSidebarExpanded ? 'Collapse comments section' : 'Expand comments section';
     expandCommentsIcon.innerHTML = getExpandCommentsIconSvg();
@@ -635,11 +687,92 @@ function activateExtension() {
       </svg>`;
   }
 
+  function updateCollapseCommentsButton() {
+    const isVisible = isSidebarMode();
+    collapseCommentsButton.hidden = !isVisible;
+    collapseCommentsButton.setAttribute('aria-expanded', String(!isCommentsCollapsed));
+
+    if (!isVisible) return;
+
+    const label = isCommentsCollapsed ? 'Show comments' : 'Collapse comments';
+    collapseCommentsIcon.innerHTML = getCollapseCommentsIconSvg();
+    collapseCommentsTooltip.textContent = '';
+    const textNode = document.createElement('span');
+    textNode.textContent = label;
+    collapseCommentsTooltip.append(textNode, createShortcutBadge(COLLAPSE_COMMENTS_SHORTCUT));
+    collapseCommentsButton.setAttribute('aria-label', label);
+  }
+
+  function getCollapseCommentsIconSvg() {
+    // Bar + chevron motif, rhyming with the expand button's double chevrons:
+    // top bar + down chevron = collapse away, bottom bar + up chevron = bring back.
+    const path = isCommentsCollapsed ? 'M4 19h16M7 12l5-5 5 5' : 'M4 5h16M7 12l5 5 5-5';
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="sidesy-collapse-comments-svg ${
+        isDark ? 'stroke-light' : 'stroke-dark'
+      }" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="${path}" />
+      </svg>`;
+  }
+
+  function ensureCollapsedNotice() {
+    let notice = commentsEl.querySelector(':scope > .sidesy-collapsed-notice');
+    if (!notice) {
+      notice = document.createElement('button');
+      notice.type = 'button';
+      notice.classList.add('sidesy-collapsed-notice');
+      notice.hidden = true;
+      const title = document.createElement('span');
+      title.classList.add('sidesy-collapsed-notice-title');
+      title.textContent = 'Comments section collapsed';
+      const hint = document.createElement('span');
+      hint.classList.add('sidesy-collapsed-notice-hint');
+      hint.textContent = 'Click or press X to show comments';
+      notice.append(title, hint);
+      notice.addEventListener('click', () => setCommentsCollapsed(false));
+      commentsEl.append(notice);
+    }
+    return notice;
+  }
+
+  function saveSidebarCollapsed(isCollapsed) {
+    ext.storage.local.set({ [COLLAPSED_STATE_STORAGE_KEY]: isCollapsed });
+  }
+
+  function setCommentsCollapsed(collapsed) {
+    if (collapsed && !isSidebarMode()) return;
+    isCommentsCollapsed = collapsed;
+    const notice = ensureCollapsedNotice();
+    // Dedicated smooth curves (no bounce) — the large height change of the
+    // radical collapse makes Z's springy curve look wrong.
+    setCollapseHeightAnimation(collapsed);
+    if (collapsed) {
+      commentsEl.classList.add('sidesy-collapsed');
+      commentsEl.style.height = `${SIDESY_COLLAPSED_HEIGHT}px`;
+      commentsEl.scrollTop = 0;
+      notice.hidden = false;
+    } else {
+      commentsEl.classList.remove('sidesy-collapsed');
+      notice.hidden = true;
+      syncSidebarHeight();
+    }
+    updateExpandCommentsButton();
+    updateCollapseCommentsButton();
+    saveSidebarCollapsed(isCommentsCollapsed);
+  }
+
   function syncSidebarHeight() {
     if (!isSidebarMode()) return;
 
+    if (isCommentsCollapsed) {
+      updateExpandCommentsButton();
+      updateCollapseCommentsButton();
+      return;
+    }
+
     commentsEl.style.height = `${getSidebarHeight()}px`;
     updateExpandCommentsButton();
+    updateCollapseCommentsButton();
   }
 
   function syncSidebarHeightWithNextFrame() {
@@ -647,8 +780,29 @@ function activateExtension() {
     requestAnimationFrame(syncSidebarHeight);
   }
 
+  function setCollapseHeightAnimation(collapsing) {
+    commentsEl.classList.remove(
+      'sidesy-height-expand', 'sidesy-height-collapse',
+      'sidesy-height-expand-smooth', 'sidesy-height-collapse-smooth'
+    );
+    commentsEl.classList.add(collapsing ? 'sidesy-height-collapse-smooth' : 'sidesy-height-expand-smooth');
+
+    if (sidebarHeightAnimationTimeout) {
+      clearTimeout(sidebarHeightAnimationTimeout);
+      sidebarHeightAnimationTimeout = null;
+    }
+
+    sidebarHeightAnimationTimeout = setTimeout(() => {
+      commentsEl.classList.remove('sidesy-height-expand-smooth', 'sidesy-height-collapse-smooth');
+      sidebarHeightAnimationTimeout = null;
+    }, collapsing ? 300 : 260);
+  }
+
   function setSidebarHeightAnimation(isExpanding) {
-    commentsEl.classList.remove('sidesy-height-expand', 'sidesy-height-collapse');
+    commentsEl.classList.remove(
+      'sidesy-height-expand', 'sidesy-height-collapse',
+      'sidesy-height-expand-smooth', 'sidesy-height-collapse-smooth'
+    );
     commentsEl.classList.add(isExpanding ? 'sidesy-height-expand' : 'sidesy-height-collapse');
 
     if (sidebarHeightAnimationTimeout) {
@@ -770,8 +924,12 @@ function activateExtension() {
   function defaultView() {
     commentsEl.style.display = 'none';
     commentsEl.classList.remove('popout', 'dark-mode', 'light-mode');
+    commentsEl.classList.remove('sidesy-collapsed');
+    const collapsedNotice = commentsEl.querySelector(':scope > .sidesy-collapsed-notice');
+    if (collapsedNotice) collapsedNotice.hidden = true;
     commentsEl.style.height = 'auto';
     updateExpandCommentsButton();
+    updateCollapseCommentsButton();
     iconContainer.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
         isDark ? 'stroke-light' : 'stroke-dark'
@@ -798,7 +956,18 @@ function activateExtension() {
     </svg>`;
 
     sidebar.prepend(commentsEl);
-    syncSidebarHeightWithNextFrame();
+    if (isCommentsCollapsed) {
+      const notice = ensureCollapsedNotice();
+      commentsEl.classList.add('sidesy-collapsed');
+      commentsEl.style.height = `${SIDESY_COLLAPSED_HEIGHT}px`;
+      commentsEl.scrollTop = 0;
+      notice.hidden = false;
+      updateExpandCommentsButton();
+      updateCollapseCommentsButton();
+    } else {
+      syncSidebarHeightWithNextFrame();
+      updateCollapseCommentsButton();
+    }
 
     savePosition('sidebar');
   }
@@ -841,15 +1010,29 @@ function activateExtension() {
     if (event.defaultPrevented || event.repeat) return;
     if (event.key.toLowerCase() !== 'z') return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
-    if (!isSidebarMode() || isEditableTarget(event.target)) return;
+    if (!isSidebarMode() || isCommentsCollapsed || isEditableTarget(event.target)) return;
 
     event.preventDefault();
     handleExpandCommentsClick();
   }
 
+  function handleCollapseCommentsClick() {
+    setCommentsCollapsed(!isCommentsCollapsed);
+  }
+
+  function handleCollapseCommentsKeydown(event) {
+    if (event.defaultPrevented || event.repeat) return;
+    if (event.key.toLowerCase() !== COLLAPSE_COMMENTS_SHORTCUT.toLowerCase()) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (!isSidebarMode() || isEditableTarget(event.target)) return;
+
+    event.preventDefault();
+    handleCollapseCommentsClick();
+  }
+
   const header = document.createElement('header');
   header.classList.add('comments-header');
-  header.append(expandCommentsButton, popButton);
+  header.append(collapseCommentsButton, expandCommentsButton, popButton);
   commentsEl.prepend(header);
 
   videoSizeButton.addEventListener('click', () => {
@@ -862,7 +1045,9 @@ function activateExtension() {
   popButton.addEventListener('click', handleToggleClick);
   popButton.addEventListener('mouseenter', syncAndRenderTooltip);
   expandCommentsButton.addEventListener('click', handleExpandCommentsClick);
+  collapseCommentsButton.addEventListener('click', handleCollapseCommentsClick);
   document.addEventListener('keydown', handleExpandCommentsKeydown);
+  document.addEventListener('keydown', handleCollapseCommentsKeydown);
   window.addEventListener('resize', syncSidebarHeight);
   activeExtensionCleanup = () => {
     if (sidebarHeightAnimationTimeout) {
@@ -870,14 +1055,23 @@ function activateExtension() {
       sidebarHeightAnimationTimeout = null;
     }
     document.removeEventListener('keydown', handleExpandCommentsKeydown);
+    document.removeEventListener('keydown', handleCollapseCommentsKeydown);
     window.removeEventListener('resize', syncSidebarHeight);
   };
 
-  chrome.storage.local.get(['comments_placement', 'sidebar_comments_expanded']).then((data) => {
+  ext.storage.local.get(['comments_placement', 'sidebar_comments_expanded', COLLAPSE_DEFAULT_STORAGE_KEY]).then((data) => {
     isSidebarExpanded = data.sidebar_comments_expanded === true;
+    collapseByDefault = data[COLLAPSE_DEFAULT_STORAGE_KEY] === true;
 
-    if (data.comments_placement === 'default') defaultView();
-    else sidebarView();
+    if (data.comments_placement === 'default') {
+      // Collapse only applies to the sidebar; an explicit below-video
+      // placement wins over the collapse default until the user pops out.
+      isCommentsCollapsed = false;
+      defaultView();
+    } else {
+      isCommentsCollapsed = collapseByDefault;
+      sidebarView();
+    }
   });
 
   maybeShowAnnouncement(isDark);

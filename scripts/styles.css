@@ -26,6 +26,10 @@
   padding: 0 16px 24px;
   margin-bottom: 24px;
   border-radius: 12px;
+  /* Firefox: ::-webkit-scrollbar rules below are ignored, so set the
+     standard properties too (thin grey thumb, transparent track). */
+  scrollbar-width: thin;
+  scrollbar-color: #aaa transparent;
 }
 
 .sidesy-height-expand {
@@ -34,6 +38,16 @@
 
 .sidesy-height-collapse {
   transition: height 210ms cubic-bezier(0.34, 1.35, 0.64, 1);
+}
+
+/* Smooth (bounce-free) curves for the radical X collapse/restore, whose
+   large height change makes the springy Z curve look wrong. */
+.sidesy-height-collapse-smooth {
+  transition: height 260ms ease-in-out;
+}
+
+.sidesy-height-expand-smooth {
+  transition: height 220ms ease-out;
 }
 
 .popout::-webkit-scrollbar {
@@ -86,11 +100,13 @@
   opacity: 1;
 }
 
-.sidesy-expand-comments-btn {
+.sidesy-expand-comments-btn,
+.sidesy-collapse-comments-btn {
   flex-shrink: 0;
 }
 
-.sidesy-expand-comments-icon {
+.sidesy-expand-comments-icon,
+.sidesy-collapse-comments-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -98,20 +114,100 @@
   height: 22px;
 }
 
-.sidesy-expand-comments-svg {
+.sidesy-expand-comments-svg,
+.sidesy-collapse-comments-svg {
   width: 22px;
   height: 22px;
   fill: none;
   stroke-width: 2;
 }
 
-.sidesy-expand-comments-btn[hidden] {
+.sidesy-expand-comments-btn[hidden],
+.sidesy-collapse-comments-btn[hidden] {
   display: none;
+}
+
+/* Parked (X-collapsed) Z button: invisible but keeps its slot, so the
+   collapse + toggle buttons never shift position between states. */
+.comments-header-btn.sidesy-btn-parked {
+  visibility: hidden;
+}
+
+/* Radical collapse: hide everything but the header + notice, leaving a
+   slim "Comments section collapsed" bar where the sidebar was. Height itself
+   is animated via the same sidesy-height-expand/collapse classes as Z. */
+.popout.sidesy-collapsed {
+  overflow: hidden;
+  /* 16px top offset mirrors the expanded sticky header (top: 16px), so the
+     buttons sit at the exact same position in both states. Total ≈ 104px:
+     16 offset + 28 header + notice + 8 bottom. */
+  padding-top: 16px;
+  padding-bottom: 8px;
+}
+
+/* In the slim bar the sticky header would float over the notice — stack it
+   in normal flow instead: header (28) + notice + 8px padding ≈ 88px. */
+.popout.sidesy-collapsed > .comments-header {
+  position: static;
+}
+
+.popout.sidesy-collapsed > :not(.comments-header):not(.sidesy-collapsed-notice) {
+  display: none;
+}
+
+.sidesy-collapsed-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  background: none;
+  border: 1px dashed currentColor;
+  border-radius: 8px;
+  font-family: "Roboto", Arial, sans-serif;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.sidesy-collapsed-notice[hidden] {
+  display: none;
+}
+
+.sidesy-collapsed-notice:hover {
+  opacity: 1;
+}
+
+/* Buttons don't inherit page text color (they use system ButtonText), so set
+   explicit theme colors — otherwise the notice is near-invisible in dark mode. */
+.dark-mode .sidesy-collapsed-notice {
+  color: #fff;
+}
+
+.light-mode .sidesy-collapsed-notice {
+  color: #0f0f0f;
+}
+
+.sidesy-collapsed-notice-title {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sidesy-collapsed-notice-hint {
+  font-size: 11px;
+  opacity: 0.8;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .sidesy-height-expand,
-  .sidesy-height-collapse {
+  .sidesy-height-collapse,
+  .sidesy-height-collapse-smooth,
+  .sidesy-height-expand-smooth {
     transition: none;
   }
 }
