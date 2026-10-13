@@ -81,6 +81,14 @@ body {
   gap: 2px;
 }
 
+.popup-section-label {
+  padding: 10px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-muted);
+}
+
 #popup-menu a {
   display: flex;
   align-items: center;
@@ -116,14 +124,17 @@ body {
 
 .link-icon svg {
   display: block;
-  stroke: currentColor;
-  fill: none;
   transition: fill 0.15s ease;
 }
 
-#popup-menu a:hover .link-icon svg {
+#popup-menu a:hover .link-icon svg[fill="none"] {
   fill: var(--icon-hover-color);
   fill-opacity: 0.15;
+}
+
+#popup-menu a:hover .link-icon svg:not([fill="none"]) {
+  fill: currentColor;
+  fill-opacity: 1;
 }
 
 #popup-menu a:hover .link-icon {
