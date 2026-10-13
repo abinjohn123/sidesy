@@ -1,7 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
   const menu = document.getElementById("popup-menu");
 
-  CONSTANTS.POPUP_LINKS.forEach(({ label, description, icon, hoverColor, url, sectionLabel }) => {
+  CONSTANTS.POPUP_LINKS.forEach(({ enabled = true, label, description, icon, hoverColor, url, sectionLabel }) => {
+    if (!enabled) return;
+
     if (sectionLabel) {
       const section = document.createElement("span");
       section.className = "popup-section-label";

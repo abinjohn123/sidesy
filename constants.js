@@ -1,3 +1,9 @@
+// Branch-specific build settings. Keep this enabled on the Chromium branch and
+// disabled on Firefox, where the promoted extension is not available.
+const BUILD_CONFIG = Object.freeze({
+  enableConduktorPromotion: true,
+});
+
 const CONSTANTS = {
   WELCOME_PAGE_URL: "https://abinjohn123.github.io/sidesy-landing/",
   POPUP_LINKS: [
@@ -30,6 +36,7 @@ const CONSTANTS = {
       url: "https://buymeacoffee.com/abin.john",
     },
     {
+      enabled: BUILD_CONFIG.enableConduktorPromotion,
       label: "Conduktor",
       description: "Spotlight-style launcher for Chrome",
       icon: "popup/icons/conduktor.svg",
@@ -44,7 +51,7 @@ const CONSTANTS = {
     ],
   },
   DEVELOPER_MESSAGE: {
-    enabled: true,
+    enabled: BUILD_CONFIG.enableConduktorPromotion,
     id: "conduktor-2026-05",
     title: "Hi, it's Abin from Sidesy",
     bodyParagraphs: [
