@@ -46,6 +46,10 @@
   },
   "web_accessible_resources": [
     "images/sidesy-128.png",
-    "images/close.svg"
+    "images/close.svg",
+    "images/shortcut-icons/cmd.svg",
+    "images/shortcut-icons/control.svg",
+    "images/shortcut-icons/option-icon.svg",
+    "images/shortcut-icons/shift.svg"
   ]
 }

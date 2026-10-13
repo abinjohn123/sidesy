@@ -6,10 +6,21 @@ page navigation and then watch for comments to become ready.
 */
 
 const TOGGLE_BTN_ID = 'sidesy-toggle-btn';
+const EXPAND_COMMENTS_BTN_ID = 'sidesy-expand-comments-btn';
+const EXPAND_COMMENTS_SHORTCUT = 'Z';
+const SIDEBAR_BOTTOM_PADDING = 24;
+const SIDEBAR_MIN_EXPANDED_HEIGHT = 240;
+const MAC_SHORTCUT_ICON_URLS = {
+  command: chrome.runtime.getURL('images/shortcut-icons/cmd.svg'),
+  control: chrome.runtime.getURL('images/shortcut-icons/control.svg'),
+  option: chrome.runtime.getURL('images/shortcut-icons/option-icon.svg'),
+  shift: chrome.runtime.getURL('images/shortcut-icons/shift.svg'),
+};
 
 // State for the current navigation
 let currentObserver = null;
 let currentInterval = null;
+let activeExtensionCleanup = null;
 let activated = false;
 
 // Listen for keyboard shortcut messages from the background script
@@ -50,24 +61,122 @@ document.addEventListener('keydown', (event) => {
 
 const WATCH_PAGE_PATTERN = 'youtube.com/watch';
 const ANNOUNCEMENT_TOAST_ID = 'sidesy-announcement';
+const DEVELOPER_MESSAGE_TOAST_ID = 'sidesy-developer-message';
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function isMacPlatform() {
   const platform = navigator.userAgentData?.platform ?? navigator.platform;
   return /Mac|iPod|iPhone|iPad/i.test(platform);
 }
 
-function getToggleShortcut() {
+function getDefaultShortcutLabel() {
   return isMacPlatform() ? '⌥\u2002+\u2002⇧\u2002+\u2002S'
-    : 'Alt\u2002+\u2002Shift\u2002+\u2002S';;
+    : 'Alt\u2002+\u2002Shift\u2002+\u2002S';
+}
+
+function normalizeShortcutPart(part) {
+  const normalizedPart = part.trim().toLowerCase();
+
+  if (normalizedPart === 'command' || normalizedPart === 'cmd' || normalizedPart === 'meta') {
+    return { type: 'modifier', value: 'command' };
+  }
+
+  if (normalizedPart === 'macctrl' || normalizedPart === 'ctrl' || normalizedPart === 'control') {
+    return { type: 'modifier', value: 'control' };
+  }
+
+  if (normalizedPart === 'alt' || normalizedPart === 'option') {
+    return { type: 'modifier', value: 'option' };
+  }
+
+  if (normalizedPart === 'shift') {
+    return { type: 'modifier', value: 'shift' };
+  }
+
+  return { type: 'key', value: part.trim().toUpperCase() };
+}
+
+function parseShortcut(shortcut) {
+  return shortcut
+    .split('+')
+    .map(normalizeShortcutPart)
+    .filter(({ value }) => value.length > 0);
+}
+
+function formatShortcutText(shortcut) {
+  return shortcut.replace(/\+/g, '\u2002+\u2002');
+}
+
+function createMacShortcutBadge(shortcut) {
+  const shortcutBadge = document.createElement('span');
+  shortcutBadge.classList.add('sidesy-tooltip-key', 'sidesy-tooltip-key-mac');
+
+  for (const part of parseShortcut(shortcut)) {
+    if (part.type === 'modifier') {
+      const icon = document.createElement('span');
+      icon.classList.add('sidesy-tooltip-key-icon');
+      icon.style.setProperty('--sidesy-shortcut-icon', `url("${MAC_SHORTCUT_ICON_URLS[part.value]}")`);
+      shortcutBadge.append(icon);
+      continue;
+    }
+
+    const token = document.createElement('span');
+    token.classList.add('sidesy-tooltip-key-token');
+    token.textContent = part.value;
+    shortcutBadge.append(token);
+  }
+
+  return shortcutBadge;
+}
+
+function createShortcutBadge(shortcut) {
+  if (isMacPlatform()) {
+    return createMacShortcutBadge(shortcut);
+  }
+
+  const shortcutBadge = document.createElement('span');
+  shortcutBadge.classList.add('sidesy-tooltip-key');
+  shortcutBadge.textContent = formatShortcutText(shortcut);
+  return shortcutBadge;
+}
+
+async function getToggleShortcutInfo() {
+  try {
+    return await chrome.runtime.sendMessage({
+      action: 'get-toggle-shortcut-info',
+    });
+  } catch {
+    return {
+      shortcut: '',
+      isRegistered: false,
+    };
+  }
 }
 
 function isWatchPageUrl() {
   return location.href.includes(WATCH_PAGE_PATTERN);
 }
 
+function isEditableTarget(target) {
+  if (!(target instanceof Element)) return false;
+
+  if (target.closest('input, textarea, select')) return true;
+
+  const contentEditable = target.closest('[contenteditable]');
+  return Boolean(
+    contentEditable &&
+    contentEditable.getAttribute('contenteditable')?.toLowerCase() !== 'false'
+  );
+}
+
 function removeAnnouncementToast() {
   const banner = document.getElementById(ANNOUNCEMENT_TOAST_ID);
   if (banner) banner.remove();
+}
+
+function removeDeveloperMessageToast() {
+  const toast = document.getElementById(DEVELOPER_MESSAGE_TOAST_ID);
+  if (toast) toast.remove();
 }
 
 function cleanup() {
@@ -78,6 +187,10 @@ function cleanup() {
   if (currentInterval) {
     clearInterval(currentInterval);
     currentInterval = null;
+  }
+  if (activeExtensionCleanup) {
+    activeExtensionCleanup();
+    activeExtensionCleanup = null;
   }
   activated = false;
 }
@@ -156,6 +269,7 @@ function onNavigate() {
 
   if (!isWatchPage) {
     removeAnnouncementToast();
+    removeDeveloperMessageToast();
     return;
   }
 
@@ -183,6 +297,10 @@ Save current extension position locally
 
 function savePosition(position) {
   chrome.storage.local.set({ comments_placement: position });
+}
+
+function saveSidebarExpanded(isExpanded) {
+  chrome.storage.local.set({ sidebar_comments_expanded: isExpanded });
 }
 
 /*
@@ -238,7 +356,7 @@ function maybeShowAnnouncement(isDark) {
 
     const list = document.createElement('ul');
     list.classList.add('sidesy-announcement-list');
-    const shortcutLabel = getToggleShortcut();
+    const shortcutLabel = getDefaultShortcutLabel();
     
     for (const rawItem of items) {
       const item = rawItem.replace('{{TOGGLE_SHORTCUT}}', shortcutLabel);
@@ -258,6 +376,176 @@ function maybeShowAnnouncement(isDark) {
 
     document.body.append(banner);
   });
+}
+
+function getDeveloperMessageConfig() {
+  const config = CONSTANTS.DEVELOPER_MESSAGE;
+  if (!config?.enabled) return null;
+  if (!config.id || !config.title || !config.url) return null;
+  if (!Array.isArray(config.bodyParagraphs) || config.bodyParagraphs.length === 0) {
+    return null;
+  }
+  if (!Number.isFinite(config.existingUserDelayDays)) return null;
+  if (!Number.isFinite(config.newUserDelayDays)) return null;
+  if (!Number.isFinite(config.remindLaterDays)) return null;
+  if (!Number.isFinite(config.maxReminders)) return null;
+  if (!Number.isFinite(config.showDelayMs)) return null;
+  return config;
+}
+
+function createDeveloperMessageState(config, now) {
+  return {
+    campaignId: config.id,
+    firstSeenAt: now,
+    dismissedAt: null,
+    clickedAt: null,
+    remindAfter: null,
+    reminderCount: 0,
+  };
+}
+
+function getDeveloperMessageState(config, rawState, now) {
+  if (rawState?.campaignId === config.id && Number.isFinite(rawState.firstSeenAt)) {
+    return rawState;
+  }
+
+  return createDeveloperMessageState(config, now);
+}
+
+function isDeveloperMessageEligible(config, state, installedAt, pendingAnnouncement, now) {
+  if (pendingAnnouncement) return false;
+  if (state.dismissedAt || state.clickedAt) return false;
+  if (state.remindAfter && now < state.remindAfter) return false;
+
+  const installTime = Number(installedAt);
+  const delayDays = Number.isFinite(installTime)
+    ? config.newUserDelayDays
+    : config.existingUserDelayDays;
+  const baseTime = Number.isFinite(installTime) ? installTime : state.firstSeenAt;
+  const eligibleAt = baseTime + delayDays * DAY_MS;
+
+  return now >= eligibleAt;
+}
+
+function dismissDeveloperMessage(toast, state, extraState = {}) {
+  chrome.storage.local.set({
+    developer_message_state: {
+      ...state,
+      ...extraState,
+    },
+  });
+
+  toast.classList.add('sidesy-slide-out');
+  toast.addEventListener('animationend', () => toast.remove(), { once: true });
+}
+
+function renderDeveloperMessage(isDark, config, state) {
+  if (!isWatchPageUrl()) return;
+  if (document.getElementById(DEVELOPER_MESSAGE_TOAST_ID)) return;
+  if (document.getElementById(ANNOUNCEMENT_TOAST_ID)) return;
+
+  const toast = document.createElement('div');
+  toast.id = DEVELOPER_MESSAGE_TOAST_ID;
+  toast.classList.add('sidesy-developer-message', isDark ? 'dark-mode' : 'light-mode');
+
+  const titleRow = document.createElement('div');
+  titleRow.classList.add('sidesy-developer-message-title');
+
+  const icon = document.createElement('img');
+  icon.src = chrome.runtime.getURL('images/sidesy-128.png');
+  icon.classList.add('sidesy-developer-message-icon');
+
+  const titleText = document.createElement('span');
+  titleText.textContent = config.title;
+
+  titleRow.append(icon, titleText);
+
+  const body = document.createElement('div');
+  body.classList.add('sidesy-developer-message-body');
+
+  config.bodyParagraphs.forEach((paragraph) => {
+    const text = String(paragraph).trim();
+    if (!text) return;
+
+    const bodyParagraph = document.createElement('p');
+    bodyParagraph.textContent = text;
+    body.append(bodyParagraph);
+  });
+
+  const actions = document.createElement('div');
+  actions.classList.add('sidesy-developer-message-actions');
+
+  const discard = document.createElement('button');
+  discard.classList.add('sidesy-developer-message-discard');
+  discard.textContent = config.dismissLabel;
+  discard.addEventListener('click', () => {
+    dismissDeveloperMessage(toast, state, { dismissedAt: Date.now() });
+  });
+  actions.append(discard);
+
+  const cta = document.createElement('button');
+  cta.classList.add('sidesy-developer-message-cta');
+  cta.textContent = config.ctaLabel;
+  cta.addEventListener('click', () => {
+    dismissDeveloperMessage(toast, state, { clickedAt: Date.now() });
+    window.open(config.url, '_blank', 'noopener,noreferrer');
+  });
+
+  const canRemindLater = (state.reminderCount || 0) < config.maxReminders;
+  if (canRemindLater) {
+    const remind = document.createElement('button');
+    remind.classList.add('sidesy-developer-message-remind');
+    remind.textContent = config.remindLabel;
+    remind.addEventListener('click', () => {
+      const now = Date.now();
+      dismissDeveloperMessage(toast, state, {
+        remindAfter: now + config.remindLaterDays * DAY_MS,
+        reminderCount: (state.reminderCount || 0) + 1,
+      });
+    });
+    actions.append(remind);
+  }
+
+  actions.append(cta);
+
+  toast.append(titleRow, body, actions);
+  document.body.append(toast);
+}
+
+function maybeShowDeveloperMessage(isDark) {
+  const config = getDeveloperMessageConfig();
+  if (!config || !isWatchPageUrl()) return;
+
+  window.setTimeout(() => {
+    if (!isWatchPageUrl()) return;
+
+    chrome.storage.local.get([
+      'developer_message_state',
+      'extension_installed_at',
+      'pending_announcement',
+    ]).then((data) => {
+      if (!isWatchPageUrl()) return;
+
+      const now = Date.now();
+      const state = getDeveloperMessageState(config, data.developer_message_state, now);
+
+      if (state !== data.developer_message_state) {
+        chrome.storage.local.set({ developer_message_state: state });
+      }
+
+      if (!isDeveloperMessageEligible(
+        config,
+        state,
+        data.extension_installed_at,
+        data.pending_announcement,
+        now
+      )) {
+        return;
+      }
+
+      renderDeveloperMessage(isDark, config, state);
+    }).catch(() => {});
+  }, config.showDelayMs);
 }
 
 /*
@@ -281,11 +569,13 @@ function activateExtension() {
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
 
-  const shortcutKey = getToggleShortcut();
+  const existingHeader = commentsEl.querySelector(':scope > .comments-header');
+  if (existingHeader) existingHeader.remove();
 
   const popButton = document.createElement('button');
   popButton.id = TOGGLE_BTN_ID;
   popButton.classList.add('comments-header-btn');
+  popButton.type = 'button';
 
   const iconContainer = document.createElement('span');
   popButton.appendChild(iconContainer);
@@ -294,8 +584,111 @@ function activateExtension() {
   tooltip.classList.add('sidesy-tooltip');
   popButton.appendChild(tooltip);
 
+  const expandCommentsButton = document.createElement('button');
+  expandCommentsButton.id = EXPAND_COMMENTS_BTN_ID;
+  expandCommentsButton.classList.add('comments-header-btn', 'sidesy-expand-comments-btn');
+  expandCommentsButton.type = 'button';
+
+  const expandCommentsIcon = document.createElement('span');
+  expandCommentsIcon.classList.add('sidesy-expand-comments-icon');
+  expandCommentsButton.appendChild(expandCommentsIcon);
+
+  const expandCommentsTooltip = document.createElement('span');
+  expandCommentsTooltip.classList.add('sidesy-tooltip');
+  expandCommentsButton.appendChild(expandCommentsTooltip);
+
+  let isSidebarExpanded = false;
+  let sidebarHeightAnimationTimeout = null;
+
   function isSidebarMode() {
     return commentsEl.classList.contains('popout');
+  }
+
+  function getYouTubeHeaderBottom() {
+    const header = document.querySelector('#masthead-container');
+    if (!header) return 0;
+
+    return Math.max(0, header.getBoundingClientRect().bottom);
+  }
+
+  function getSidebarContentAboveHeight() {
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const commentsRect = commentsEl.getBoundingClientRect();
+    return Math.max(0, commentsRect.top - sidebarRect.top);
+  }
+
+  function getSidebarHeight() {
+    if (!isSidebarExpanded) return player.offsetHeight;
+
+    const expandedHeight = (
+      window.innerHeight -
+      getYouTubeHeaderBottom() -
+      getSidebarContentAboveHeight() -
+      SIDEBAR_BOTTOM_PADDING
+    );
+
+    return Math.max(SIDEBAR_MIN_EXPANDED_HEIGHT, expandedHeight);
+  }
+
+  function updateExpandCommentsButton() {
+    const isVisible = isSidebarMode();
+    expandCommentsButton.hidden = !isVisible;
+    expandCommentsButton.setAttribute('aria-expanded', String(isSidebarExpanded));
+
+    if (!isVisible) return;
+
+    const label = isSidebarExpanded ? 'Collapse comments section' : 'Expand comments section';
+    expandCommentsIcon.innerHTML = getExpandCommentsIconSvg();
+    expandCommentsTooltip.textContent = '';
+    const textNode = document.createElement('span');
+    textNode.textContent = label;
+    expandCommentsTooltip.append(textNode, createShortcutBadge(EXPAND_COMMENTS_SHORTCUT));
+    expandCommentsButton.setAttribute('aria-label', label);
+  }
+
+  function getExpandCommentsIconSvg() {
+    if (isSidebarExpanded) {
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="sidesy-expand-comments-svg ${
+          isDark ? 'stroke-light' : 'stroke-dark'
+        }" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 5l5 5 5-5M7 19l5-5 5 5" />
+        </svg>`;
+    }
+
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="sidesy-expand-comments-svg ${
+        isDark ? 'stroke-light' : 'stroke-dark'
+      }" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+      </svg>`;
+  }
+
+  function syncSidebarHeight() {
+    if (!isSidebarMode()) return;
+
+    commentsEl.style.height = `${getSidebarHeight()}px`;
+    updateExpandCommentsButton();
+  }
+
+  function syncSidebarHeightWithNextFrame() {
+    syncSidebarHeight();
+    requestAnimationFrame(syncSidebarHeight);
+  }
+
+  function setSidebarHeightAnimation(isExpanding) {
+    commentsEl.classList.remove('sidesy-height-expand', 'sidesy-height-collapse');
+    commentsEl.classList.add(isExpanding ? 'sidesy-height-expand' : 'sidesy-height-collapse');
+
+    if (sidebarHeightAnimationTimeout) {
+      clearTimeout(sidebarHeightAnimationTimeout);
+      sidebarHeightAnimationTimeout = null;
+    }
+
+    sidebarHeightAnimationTimeout = setTimeout(() => {
+      commentsEl.classList.remove('sidesy-height-expand', 'sidesy-height-collapse');
+      sidebarHeightAnimationTimeout = null;
+    }, isExpanding ? 170 : 260);
   }
 
   function getActiveViewport(mode) {
@@ -381,16 +774,33 @@ function activateExtension() {
     window.scrollBy({ top: delta, behavior: 'auto' });
   }
 
-  function updateTooltip(text) {
-    tooltip.innerHTML = `${text} <span class="sidesy-tooltip-key">${shortcutKey}</span>`;
+  function updateTooltip(text, shortcutInfo) {
+    tooltip.textContent = '';
+
+    const textNode = document.createElement('span');
+    textNode.textContent = text;
+    tooltip.append(textNode);
+
+    if (shortcutInfo?.isRegistered && shortcutInfo.shortcut) {
+      tooltip.append(createShortcutBadge(shortcutInfo.shortcut));
+    }
+  }
+
+  function getTooltipText() {
+    return isSidebarMode() ? 'Show comments below video' : 'Show comments in sidebar';
+  }
+
+  function syncAndRenderTooltip() {
+    getToggleShortcutInfo().then((shortcutInfo) => {
+      updateTooltip(getTooltipText(), shortcutInfo);
+    });
   }
 
   function defaultView() {
     commentsEl.style.display = 'none';
     commentsEl.classList.remove('popout', 'dark-mode', 'light-mode');
     commentsEl.style.height = 'auto';
-
-    updateTooltip('Show comments in sidebar');
+    updateExpandCommentsButton();
     iconContainer.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
         isDark ? 'stroke-light' : 'stroke-dark'
@@ -409,12 +819,6 @@ function activateExtension() {
       videoSizeButton.click();
     }
     commentsEl.classList.add('popout', isDark ? 'dark-mode' : 'light-mode');
-    commentsEl.style.height = `${player.offsetHeight}px`;
-    requestAnimationFrame(() => {
-      commentsEl.style.height = `${player.offsetHeight}px`;
-    });
-
-    updateTooltip('Show comments below video');
     iconContainer.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="comments-icon ${
       isDark ? 'stroke-light' : 'stroke-dark'
@@ -423,6 +827,7 @@ function activateExtension() {
     </svg>`;
 
     sidebar.prepend(commentsEl);
+    syncSidebarHeightWithNextFrame();
 
     savePosition('sidebar');
   }
@@ -453,12 +858,28 @@ function activateExtension() {
     switchMode(isSidebarMode() ? 'default' : 'sidebar');
   }
 
-  if (!commentsEl.querySelector('header')) {
-    const header = document.createElement('header');
-    header.classList.add('comments-header');
-    header.append(popButton);
-    commentsEl.prepend(header);
+  function handleExpandCommentsClick() {
+    const willExpand = !isSidebarExpanded;
+    setSidebarHeightAnimation(willExpand);
+    isSidebarExpanded = willExpand;
+    syncSidebarHeight();
+    saveSidebarExpanded(isSidebarExpanded);
   }
+
+  function handleExpandCommentsKeydown(event) {
+    if (event.defaultPrevented || event.repeat) return;
+    if (event.key.toLowerCase() !== 'z') return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (!isSidebarMode() || isEditableTarget(event.target)) return;
+
+    event.preventDefault();
+    handleExpandCommentsClick();
+  }
+
+  const header = document.createElement('header');
+  header.classList.add('comments-header');
+  header.append(expandCommentsButton, popButton);
+  commentsEl.prepend(header);
 
   videoSizeButton.addEventListener('click', () => {
     boolTheaterMode = !boolTheaterMode;
@@ -468,11 +889,26 @@ function activateExtension() {
     }
   });
   popButton.addEventListener('click', handleToggleClick);
+  popButton.addEventListener('mouseenter', syncAndRenderTooltip);
+  expandCommentsButton.addEventListener('click', handleExpandCommentsClick);
+  document.addEventListener('keydown', handleExpandCommentsKeydown);
+  window.addEventListener('resize', syncSidebarHeight);
+  activeExtensionCleanup = () => {
+    if (sidebarHeightAnimationTimeout) {
+      clearTimeout(sidebarHeightAnimationTimeout);
+      sidebarHeightAnimationTimeout = null;
+    }
+    document.removeEventListener('keydown', handleExpandCommentsKeydown);
+    window.removeEventListener('resize', syncSidebarHeight);
+  };
 
-  chrome.storage.local.get(['comments_placement']).then((data) => {
+  chrome.storage.local.get(['comments_placement', 'sidebar_comments_expanded']).then((data) => {
+    isSidebarExpanded = data.sidebar_comments_expanded === true;
+
     if (data.comments_placement === 'default') defaultView();
     else sidebarView();
   });
 
   maybeShowAnnouncement(isDark);
+  maybeShowDeveloperMessage(isDark);
 }

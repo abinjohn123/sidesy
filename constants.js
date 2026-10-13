@@ -1,3 +1,9 @@
+// Branch-specific build settings. Keep this enabled on the Chromium branch and
+// disabled on Firefox, where the promoted extension is not available.
+const BUILD_CONFIG = Object.freeze({
+  enableConduktorPromotion: false,
+});
+
 const CONSTANTS = {
   WELCOME_PAGE_URL: "https://abinjohn123.github.io/sidesy-landing/",
   POPUP_LINKS: [
@@ -29,11 +35,38 @@ const CONSTANTS = {
       hoverColor: "#34a853",
       url: "https://buymeacoffee.com/abin.john",
     },
+    {
+      enabled: BUILD_CONFIG.enableConduktorPromotion,
+      label: "Conduktor",
+      description: "Spotlight-style launcher for Chrome",
+      icon: "popup/icons/conduktor.svg",
+      hoverColor: "#f85842",
+      url: "https://chromewebstore.google.com/detail/conduktor-search-rename-g/ppemfnloahkomglmckngiioogeibdbdh",
+      sectionLabel: "Also from the developer",
+    },
   ],
   ANNOUNCEMENT: {
     items: [
-      "Toggle via Shortcut\nYou can now toggle the comments position using {{TOGGLE_SHORTCUT}}.",
-      "Seamless View Switching\nWhen you toggle comments position, Sidesy restores scroll so you can keep reading without interruption.",
+      "Expandable sidebar comments\nYou can now expand comments to full height from the new header button, or by pressing Z when comments are on the side. The extra height fits more comments at once, especially on smaller screens. Thanks to everyone who asked for this!",
     ],
+  },
+  DEVELOPER_MESSAGE: {
+    enabled: BUILD_CONFIG.enableConduktorPromotion,
+    id: "conduktor-2026-05",
+    title: "Hi, it's Abin from Sidesy",
+    bodyParagraphs: [
+      "I just launched a new extension called Conduktor, a Spotlight-style launcher for Chrome.",
+      "Search tabs, manage tab groups, and run browser actions without leaving the keyboard. Built for keyboard-first users, productivity geeks, and tab hoarders.",
+      "Free to start. No account or credit card needed. 🙂",
+    ],
+    ctaLabel: "Check it out",
+    remindLabel: "Remind later",
+    dismissLabel: "Discard",
+    url: "https://chromewebstore.google.com/detail/conduktor-search-rename-g/ppemfnloahkomglmckngiioogeibdbdh",
+    existingUserDelayDays: 3,
+    newUserDelayDays: 14,
+    remindLaterDays: 14,
+    maxReminders: 1,
+    showDelayMs: 6500,
   },
 };
