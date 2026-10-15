@@ -29,6 +29,11 @@ let currentObserver = null;
 let currentInterval = null;
 let activeExtensionCleanup = null;
 let activated = false;
+// Fullscreen can orphan the activation's closure (YouTube replaces #comments
+// during the transition). Stash a raw scroll position here so the fresh
+// activation for the *same* video can best-effort restore it. The videoId
+// guard prevents carrying scroll across different videos.
+let pendingFullscreenScroll = null;
 
 // Listen for keyboard shortcut messages from the background script
 let lastSidebarToggleAt = 0;
@@ -618,6 +623,11 @@ function activateExtension() {
   let sidebarHeightAnimationTimeout = null;
   let isCommentsCollapsed = false;
   let collapseByDefault = false;
+  // Scroll position within the sidebar (the "state" users mean when they say
+  // collapse/fullscreen loses their place). In-memory per video: each video
+  // has a different comment set, so this is intentionally not persisted.
+  let savedCollapsedScroll = null;
+  let savedFullscreenScroll = null;
 
   function isSidebarMode() {
     return commentsEl.classList.contains('popout');
@@ -745,6 +755,11 @@ function activateExtension() {
 
   function setCommentsCollapsed(collapsed) {
     if (collapsed && !isSidebarMode()) return;
+    // Save scroll *before* mutating DOM: collapsing hides threads
+    // (display:none via CSS) and resets scrollTop to 0 for the slim bar.
+    if (collapsed && !isCommentsCollapsed) {
+      savedCollapsedScroll = saveSidebarScroll();
+    }
     isCommentsCollapsed = collapsed;
     const notice = ensureCollapsedNotice();
     // Dedicated smooth curves (no bounce) — the large height change of the
@@ -759,6 +774,11 @@ function activateExtension() {
       commentsEl.classList.remove('sidesy-collapsed');
       notice.hidden = true;
       syncSidebarHeight();
+      // Restore the pre-collapse position (immediate + next-frame pass for
+      // the height animation). Consume it so a later expand starts fresh.
+      const toRestore = savedCollapsedScroll;
+      savedCollapsedScroll = null;
+      if (toRestore) restoreSidebarScroll(toRestore);
     }
     updateExpandCommentsButton();
     updateCollapseCommentsButton();
@@ -795,13 +815,33 @@ function activateExtension() {
   function handleFullscreenChange() {
     // If YouTube replaced #comments during the fullscreen transition, the
     // captured commentsEl/header/buttons are orphaned on a detached node.
-    // Re-run navigation handling so the UI is rebuilt (init now restores
-    // the saved X state from storage).
+    // Stash raw scroll for the same video, then rebuild (init restores the
+    // saved X state from storage and consumes the stashed scroll below).
     if (document.querySelector('#comments') !== commentsEl || !commentsEl.isConnected) {
+      if (isSidebarMode() && !isCommentsCollapsed) {
+        try {
+          pendingFullscreenScroll = {
+            videoId: new URLSearchParams(location.search).get('v'),
+            scrollTop: commentsEl.scrollTop,
+          };
+        } catch { pendingFullscreenScroll = null; }
+      }
       onNavigate();
       return;
     }
+    if (document.fullscreenElement) {
+      // Entering fullscreen: sidebar gets hidden and browsers can clamp
+      // scrollTop of hidden scroll containers to 0. Save now, restore on exit.
+      if (isSidebarMode() && !isCommentsCollapsed) {
+        savedFullscreenScroll = saveSidebarScroll();
+      }
+      return;
+    }
+    // Exiting fullscreen: re-assert size, then restore pre-fullscreen place.
     syncSidebarHeightWithNextFrame();
+    const toRestore = savedFullscreenScroll;
+    savedFullscreenScroll = null;
+    if (toRestore) restoreSidebarScroll(toRestore);
   }
 
   function syncSidebarHeightWithNextFrame() {
@@ -926,6 +966,38 @@ function activateExtension() {
     }
 
     window.scrollBy({ top: delta, behavior: 'auto' });
+  }
+
+  function saveSidebarScroll() {
+    if (!isSidebarMode()) return null;
+    // Must be called while threads are still visible (before collapse class
+    // or fullscreen hides the sidebar) so anchor detection can see them.
+    return {
+      anchor: captureTopCommentAnchor(),
+      scrollTop: commentsEl.scrollTop,
+    };
+  }
+
+  function restoreSidebarScroll(saved) {
+    if (!saved || !isSidebarMode() || isCommentsCollapsed) return;
+    // Anchor survives height changes; raw scrollTop is the fallback when no
+    // thread was visible (e.g. scrolled to the very top) or it detached.
+    if (saved.anchor?.element?.isConnected) {
+      restoreTopCommentAnchor(saved.anchor, 'sidebar');
+      // Second pass next frame: height animations/layout settle async.
+      requestAnimationFrame(() => {
+        if (saved.anchor?.element?.isConnected && isSidebarMode() && !isCommentsCollapsed) {
+          restoreTopCommentAnchor(saved.anchor, 'sidebar');
+        }
+      });
+    } else if (typeof saved.scrollTop === 'number') {
+      try { commentsEl.scrollTop = saved.scrollTop; } catch {}
+      requestAnimationFrame(() => {
+        if (isSidebarMode() && !isCommentsCollapsed) {
+          try { commentsEl.scrollTop = saved.scrollTop; } catch {}
+        }
+      });
+    }
   }
 
   function updateTooltip(text, shortcutInfo) {
@@ -1108,6 +1180,28 @@ function activateExtension() {
       defaultView();
     } else {
       sidebarView();
+    }
+    // Same-video fullscreen rebuild (see handleFullscreenChange): the old
+    // thread elements are detached so only a raw scrollTop restore is
+    // possible, and only when the video is the same. New videos ignore it.
+    if (pendingFullscreenScroll) {
+      const pending = pendingFullscreenScroll;
+      pendingFullscreenScroll = null;
+      try {
+        const currentVideoId = new URLSearchParams(location.search).get('v');
+        if (pending.videoId && pending.videoId === currentVideoId && isSidebarMode() && typeof pending.scrollTop === 'number') {
+          if (isCommentsCollapsed) {
+            savedCollapsedScroll = { anchor: null, scrollTop: pending.scrollTop };
+          } else {
+            try { commentsEl.scrollTop = pending.scrollTop; } catch {}
+            requestAnimationFrame(() => {
+              if (isSidebarMode() && !isCommentsCollapsed) {
+                try { commentsEl.scrollTop = pending.scrollTop; } catch {}
+              }
+            });
+          }
+        }
+      } catch {}
     }
   });
 
