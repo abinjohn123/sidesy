@@ -627,7 +627,11 @@ function activateExtension() {
   // collapse/fullscreen loses their place). In-memory per video: each video
   // has a different comment set, so this is intentionally not persisted.
   let savedCollapsedScroll = null;
-  let savedFullscreenScroll = null;
+  // Fullscreen hide happens *before* `fullscreenchange` fires, so saving at
+  // enter-time is already too late (anchor is null, scrollTop already 0).
+  // Instead track the last *visible* position continuously while scrolling.
+  let lastVisibleSidebarScroll = null;
+  let scrollAnchorDebounce = null;
 
   function isSidebarMode() {
     return commentsEl.classList.contains('popout');
@@ -815,14 +819,14 @@ function activateExtension() {
   function handleFullscreenChange() {
     // If YouTube replaced #comments during the fullscreen transition, the
     // captured commentsEl/header/buttons are orphaned on a detached node.
-    // Stash raw scroll for the same video, then rebuild (init restores the
-    // saved X state from storage and consumes the stashed scroll below).
+    // Stash the last *visible* scroll (not the current, already-clobbered
+    // one) for the same video, then rebuild.
     if (document.querySelector('#comments') !== commentsEl || !commentsEl.isConnected) {
-      if (isSidebarMode() && !isCommentsCollapsed) {
+      if (isSidebarMode() && !isCommentsCollapsed && lastVisibleSidebarScroll) {
         try {
           pendingFullscreenScroll = {
             videoId: new URLSearchParams(location.search).get('v'),
-            scrollTop: commentsEl.scrollTop,
+            scrollTop: lastVisibleSidebarScroll.scrollTop,
           };
         } catch { pendingFullscreenScroll = null; }
       }
@@ -830,18 +834,16 @@ function activateExtension() {
       return;
     }
     if (document.fullscreenElement) {
-      // Entering fullscreen: sidebar gets hidden and browsers can clamp
-      // scrollTop of hidden scroll containers to 0. Save now, restore on exit.
-      if (isSidebarMode() && !isCommentsCollapsed) {
-        savedFullscreenScroll = saveSidebarScroll();
-      }
+      // Entering fullscreen: the sidebar is already hidden, so the live
+      // scrollTop/anchor are already clobbered (0/null). Do NOT save here —
+      // `lastVisibleSidebarScroll` from the scroll tracker holds the true
+      // pre-fullscreen position. This late-save was the fullscreen bug.
       return;
     }
-    // Exiting fullscreen: re-assert size, then restore pre-fullscreen place.
+    // Exiting fullscreen: re-assert size, then restore the pre-fullscreen
+    // position tracked before the sidebar was hidden.
     syncSidebarHeightWithNextFrame();
-    const toRestore = savedFullscreenScroll;
-    savedFullscreenScroll = null;
-    if (toRestore) restoreSidebarScroll(toRestore);
+    if (lastVisibleSidebarScroll) restoreFullscreenScrollWithRetry(lastVisibleSidebarScroll);
   }
 
   function syncSidebarHeightWithNextFrame() {
@@ -1000,6 +1002,55 @@ function activateExtension() {
     }
   }
 
+  function isSidebarVisibleForTracking() {
+    if (!isSidebarMode() || isCommentsCollapsed) return false;
+    if (document.fullscreenElement) return false;
+    if (!commentsEl.isConnected) return false;
+    const rect = commentsEl.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function onSidebarScroll() {
+    // Never record hidden/clobbered state: while collapsed, fullscreen, or
+    // detached, scrollTop may read 0 — keeping the last visible value.
+    if (!isSidebarVisibleForTracking()) return;
+    const scrollTop = commentsEl.scrollTop;
+    if (lastVisibleSidebarScroll) {
+      lastVisibleSidebarScroll.scrollTop = scrollTop;
+    } else {
+      lastVisibleSidebarScroll = { anchor: null, scrollTop };
+    }
+    // Anchor capture (elementsFromPoint x6) is too costly per scroll event —
+    // refresh it debounced after scrolling settles, while still visible.
+    if (scrollAnchorDebounce) clearTimeout(scrollAnchorDebounce);
+    scrollAnchorDebounce = setTimeout(() => {
+      scrollAnchorDebounce = null;
+      if (!isSidebarVisibleForTracking()) return;
+      const anchor = captureTopCommentAnchor();
+      if (lastVisibleSidebarScroll) {
+        lastVisibleSidebarScroll.anchor = anchor;
+        lastVisibleSidebarScroll.scrollTop = commentsEl.scrollTop;
+      } else {
+        lastVisibleSidebarScroll = { anchor, scrollTop: commentsEl.scrollTop };
+      }
+    }, 200);
+  }
+
+  function restoreFullscreenScrollWithRetry(saved) {
+    if (!saved) return;
+    restoreSidebarScroll(saved);
+    // Continuations may still be settling after exit; one guarded retry in
+    // case the first restore clamped. Only retries when still at the top so
+    // it never yanks the user back after they intentionally scrolled.
+    const target = typeof saved.scrollTop === 'number' ? saved.scrollTop : null;
+    setTimeout(() => {
+      if (!isSidebarMode() || isCommentsCollapsed) return;
+      if (target !== null && target > 2 && commentsEl.scrollTop <= 2) {
+        restoreSidebarScroll(saved);
+      }
+    }, 350);
+  }
+
   function updateTooltip(text, shortcutInfo) {
     tooltip.textContent = '';
 
@@ -1151,11 +1202,17 @@ function activateExtension() {
   document.addEventListener('keydown', handleCollapseCommentsKeydown);
   window.addEventListener('resize', syncSidebarHeight);
   document.addEventListener('fullscreenchange', handleFullscreenChange);
+  commentsEl.addEventListener('scroll', onSidebarScroll, { passive: true });
   activeExtensionCleanup = () => {
     if (sidebarHeightAnimationTimeout) {
       clearTimeout(sidebarHeightAnimationTimeout);
       sidebarHeightAnimationTimeout = null;
     }
+    if (scrollAnchorDebounce) {
+      clearTimeout(scrollAnchorDebounce);
+      scrollAnchorDebounce = null;
+    }
+    commentsEl.removeEventListener('scroll', onSidebarScroll);
     document.removeEventListener('keydown', handleExpandCommentsKeydown);
     document.removeEventListener('keydown', handleCollapseCommentsKeydown);
     window.removeEventListener('resize', syncSidebarHeight);
