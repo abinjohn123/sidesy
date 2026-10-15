@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Firefox port: `browser` with `chrome` fallback.
   const ext = globalThis.browser ?? globalThis.chrome;
   const COLLAPSE_DEFAULT_KEY = "sidesy_collapse_by_default";
+  const COLLAPSED_STATE_KEY = "sidebar_comments_collapsed";
   const menu = document.getElementById("popup-menu");
 
   CONSTANTS.POPUP_LINKS.forEach(({ label, description, icon, hoverColor, url, sectionLabel }) => {
@@ -93,7 +94,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }).catch(() => {});
 
     collapseToggle.addEventListener("change", () => {
-      ext.storage.local.set({ [COLLAPSE_DEFAULT_KEY]: collapseToggle.checked }).catch(() => {});
+      // Keep the last explicit X state in sync when the default changes,
+      // otherwise a stale saved X value would override the new default on
+      // every new video.
+      ext.storage.local.set({
+        [COLLAPSE_DEFAULT_KEY]: collapseToggle.checked,
+        [COLLAPSED_STATE_KEY]: collapseToggle.checked,
+      }).catch(() => {});
     });
   }
 });

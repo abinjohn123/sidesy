@@ -562,8 +562,8 @@ function activateExtension() {
   const videoSizeButton = document.querySelector('.ytp-size-button');
 
   let boolTheaterMode = videoSizeButton
-    .getAttribute('data-title-no-tooltip')
-    .includes('Default');
+    ?.getAttribute('data-title-no-tooltip')
+    ?.includes('Default') ?? false;
 
   const isDark = page.hasAttribute('dark');
   commentsEl.classList.add('extension-control');
@@ -637,7 +637,11 @@ function activateExtension() {
   }
 
   function getSidebarHeight() {
-    if (!isSidebarExpanded) return player.offsetHeight;
+    // Re-query instead of using the activation-time `player` reference:
+    // YouTube can swap the video element on fullscreen/quality changes,
+    // leaving the captured node detached with a stale offsetHeight.
+    const activePlayer = document.querySelector('.video-stream.html5-main-video') || player;
+    if (!isSidebarExpanded) return activePlayer ? activePlayer.offsetHeight : SIDESY_COLLAPSED_HEIGHT;
 
     const expandedHeight = (
       window.innerHeight -
@@ -765,14 +769,39 @@ function activateExtension() {
     if (!isSidebarMode()) return;
 
     if (isCommentsCollapsed) {
+      // Re-assert (not just update buttons): fullscreen enter/exit and
+      // YouTube DOM shuffling can clear the inline height/class while the
+      // in-memory flag is still true. Repair it here so resize/fullscreen
+      // always converges back to the saved collapsed bar.
+      commentsEl.classList.add('sidesy-collapsed');
+      commentsEl.style.height = `${SIDESY_COLLAPSED_HEIGHT}px`;
+      const collapsedNotice = commentsEl.querySelector(':scope > .sidesy-collapsed-notice');
+      if (collapsedNotice) collapsedNotice.hidden = false;
       updateExpandCommentsButton();
       updateCollapseCommentsButton();
       return;
     }
 
+    // While fullscreen the sidebar is hidden and player metrics reflect the
+    // fullscreen video (not the sidebar layout) — defer expanded sizing
+    // until fullscreen exits (handled via fullscreenchange below).
+    if (document.fullscreenElement) return;
+
     commentsEl.style.height = `${getSidebarHeight()}px`;
     updateExpandCommentsButton();
     updateCollapseCommentsButton();
+  }
+
+  function handleFullscreenChange() {
+    // If YouTube replaced #comments during the fullscreen transition, the
+    // captured commentsEl/header/buttons are orphaned on a detached node.
+    // Re-run navigation handling so the UI is rebuilt (init now restores
+    // the saved X state from storage).
+    if (document.querySelector('#comments') !== commentsEl || !commentsEl.isConnected) {
+      onNavigate();
+      return;
+    }
+    syncSidebarHeightWithNextFrame();
   }
 
   function syncSidebarHeightWithNextFrame() {
@@ -945,7 +974,7 @@ function activateExtension() {
 
   function sidebarView() {
     if (boolTheaterMode) {
-      videoSizeButton.click();
+      videoSizeButton?.click();
     }
     commentsEl.classList.add('popout', isDark ? 'dark-mode' : 'light-mode');
     iconContainer.innerHTML = `
@@ -1035,7 +1064,7 @@ function activateExtension() {
   header.append(collapseCommentsButton, expandCommentsButton, popButton);
   commentsEl.prepend(header);
 
-  videoSizeButton.addEventListener('click', () => {
+  videoSizeButton?.addEventListener('click', () => {
     boolTheaterMode = !boolTheaterMode;
 
     if (boolTheaterMode && isSidebarMode()) {
@@ -1049,6 +1078,7 @@ function activateExtension() {
   document.addEventListener('keydown', handleExpandCommentsKeydown);
   document.addEventListener('keydown', handleCollapseCommentsKeydown);
   window.addEventListener('resize', syncSidebarHeight);
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
   activeExtensionCleanup = () => {
     if (sidebarHeightAnimationTimeout) {
       clearTimeout(sidebarHeightAnimationTimeout);
@@ -1057,19 +1087,26 @@ function activateExtension() {
     document.removeEventListener('keydown', handleExpandCommentsKeydown);
     document.removeEventListener('keydown', handleCollapseCommentsKeydown);
     window.removeEventListener('resize', syncSidebarHeight);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
   };
 
-  ext.storage.local.get(['comments_placement', 'sidebar_comments_expanded', COLLAPSE_DEFAULT_STORAGE_KEY]).then((data) => {
+  ext.storage.local.get(['comments_placement', 'sidebar_comments_expanded', COLLAPSE_DEFAULT_STORAGE_KEY, COLLAPSED_STATE_STORAGE_KEY]).then((data) => {
     isSidebarExpanded = data.sidebar_comments_expanded === true;
     collapseByDefault = data[COLLAPSE_DEFAULT_STORAGE_KEY] === true;
+    const savedCollapsed = data[COLLAPSED_STATE_STORAGE_KEY];
+    // Prefer the last explicit X state when it exists; otherwise fall back
+    // to the "collapse by default" preference. Previously the saved X value
+    // was written but never read, so every navigation/reload reset to the
+    // default preference. This also fixes fullscreen-triggered
+    // re-activations, which rebuild from the same init path.
+    const startCollapsed = typeof savedCollapsed === 'boolean' ? savedCollapsed : collapseByDefault;
+    // Collapse only applies visually in the sidebar; keep the flag even in
+    // default placement so toggling back to sidebar restores the X state.
+    isCommentsCollapsed = startCollapsed;
 
     if (data.comments_placement === 'default') {
-      // Collapse only applies to the sidebar; an explicit below-video
-      // placement wins over the collapse default until the user pops out.
-      isCommentsCollapsed = false;
       defaultView();
     } else {
-      isCommentsCollapsed = collapseByDefault;
       sidebarView();
     }
   });
