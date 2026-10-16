@@ -24,6 +24,7 @@
     }
   },
   "background": {
+    "service_worker": "background.js",
     "scripts": [
       "constants.js",
       "background.js"
