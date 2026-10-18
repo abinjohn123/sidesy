@@ -13,6 +13,7 @@ const COLLAPSE_COMMENTS_SHORTCUT = 'X';
 const SIDESY_COLLAPSED_HEIGHT = 104;
 const COLLAPSE_DEFAULT_STORAGE_KEY = 'sidesy_collapse_by_default';
 const COLLAPSED_STATE_STORAGE_KEY = 'sidebar_comments_collapsed';
+const COLLAPSED_VIDEO_STORAGE_KEY = 'sidebar_comments_collapsed_video';
 const SIDEBAR_BOTTOM_PADDING = 24;
 const SIDEBAR_MIN_EXPANDED_HEIGHT = 240;
 // Firefox port: `browser` (promise-based) with `chrome` fallback.
@@ -159,6 +160,14 @@ async function getToggleShortcutInfo() {
 
 function isWatchPageUrl() {
   return location.href.includes(WATCH_PAGE_PATTERN);
+}
+
+function getCurrentVideoId() {
+  try {
+    return new URLSearchParams(location.search).get('v');
+  } catch {
+    return null;
+  }
 }
 
 function isEditableTarget(target) {
@@ -754,7 +763,10 @@ function activateExtension() {
   }
 
   function saveSidebarCollapsed(isCollapsed) {
-    ext.storage.local.set({ [COLLAPSED_STATE_STORAGE_KEY]: isCollapsed });
+    ext.storage.local.set({
+      [COLLAPSED_STATE_STORAGE_KEY]: isCollapsed,
+      [COLLAPSED_VIDEO_STORAGE_KEY]: getCurrentVideoId(),
+    });
   }
 
   function setCommentsCollapsed(collapsed) {
@@ -825,7 +837,7 @@ function activateExtension() {
       if (isSidebarMode() && !isCommentsCollapsed && lastVisibleSidebarScroll) {
         try {
           pendingFullscreenScroll = {
-            videoId: new URLSearchParams(location.search).get('v'),
+            videoId: getCurrentVideoId(),
             scrollTop: lastVisibleSidebarScroll.scrollTop,
           };
         } catch { pendingFullscreenScroll = null; }
@@ -1219,16 +1231,21 @@ function activateExtension() {
     document.removeEventListener('fullscreenchange', handleFullscreenChange);
   };
 
-  ext.storage.local.get(['comments_placement', 'sidebar_comments_expanded', COLLAPSE_DEFAULT_STORAGE_KEY, COLLAPSED_STATE_STORAGE_KEY]).then((data) => {
+  ext.storage.local.get(['comments_placement', 'sidebar_comments_expanded', COLLAPSE_DEFAULT_STORAGE_KEY, COLLAPSED_STATE_STORAGE_KEY, COLLAPSED_VIDEO_STORAGE_KEY]).then((data) => {
     isSidebarExpanded = data.sidebar_comments_expanded === true;
     collapseByDefault = data[COLLAPSE_DEFAULT_STORAGE_KEY] === true;
     const savedCollapsed = data[COLLAPSED_STATE_STORAGE_KEY];
-    // Prefer the last explicit fold state when it exists; otherwise fall back
-    // to the "fold by default" preference. Previously the saved fold value
-    // was written but never read, so every navigation/reload reset to the
-    // default preference. This also fixes fullscreen-triggered
-    // re-activations, which rebuild from the same init path.
-    const startCollapsed = typeof savedCollapsed === 'boolean' ? savedCollapsed : collapseByDefault;
+    // New videos always start from the "fold by default" preference. The
+    // saved fold value is only reused for same-video re-activations
+    // (e.g. fullscreen enter/exit replaces #comments and rebuilds from this
+    // same init path). Without the video guard, an unfold on one video
+    // would leak into the next video and defeat the default.
+    const currentVideoId = getCurrentVideoId();
+    const storedVideoId = data[COLLAPSED_VIDEO_STORAGE_KEY];
+    const isSameVideo = Boolean(currentVideoId) && storedVideoId === currentVideoId;
+    const startCollapsed = isSameVideo && typeof savedCollapsed === 'boolean'
+      ? savedCollapsed
+      : collapseByDefault;
     // Fold only applies visually in the sidebar; keep the flag even in
     // default placement so toggling back to sidebar restores the fold state.
     isCommentsCollapsed = startCollapsed;
@@ -1245,8 +1262,8 @@ function activateExtension() {
       const pending = pendingFullscreenScroll;
       pendingFullscreenScroll = null;
       try {
-        const currentVideoId = new URLSearchParams(location.search).get('v');
-        if (pending.videoId && pending.videoId === currentVideoId && isSidebarMode() && typeof pending.scrollTop === 'number') {
+        const freshVideoId = getCurrentVideoId();
+        if (pending.videoId && pending.videoId === freshVideoId && isSidebarMode() && typeof pending.scrollTop === 'number') {
           if (isCommentsCollapsed) {
             savedCollapsedScroll = { anchor: null, scrollTop: pending.scrollTop };
           } else {
