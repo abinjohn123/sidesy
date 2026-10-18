@@ -40,8 +40,8 @@
   transition: height 210ms cubic-bezier(0.34, 1.35, 0.64, 1);
 }
 
-/* Smooth (bounce-free) curves for the radical X collapse/restore, whose
-   large height change makes the springy Z curve look wrong. */
+/* Smooth (bounce-free) curves for the radical fold/unfold, whose
+   large height change makes the springy full-height curve look wrong. */
 .sidesy-height-collapse-smooth {
   transition: height 260ms ease-in-out;
 }
@@ -127,15 +127,15 @@
   display: none;
 }
 
-/* Parked (X-collapsed) Z button: invisible but keeps its slot, so the
-   collapse + toggle buttons never shift position between states. */
+/* Parked (folded) full-height button: invisible but keeps its slot, so the
+   fold + toggle buttons never shift position between states. */
 .comments-header-btn.sidesy-btn-parked {
   visibility: hidden;
 }
 
-/* Radical collapse: hide everything but the header + notice, leaving a
-   slim "Comments section collapsed" bar where the sidebar was. Height itself
-   is animated via the same sidesy-height-expand/collapse classes as Z. */
+/* Folded state: hide everything but the header + notice, leaving a
+   slim "Comments folded away" bar where the sidebar was. Height itself
+   is animated via the same sidesy-height-expand/collapse classes as full height. */
 .popout.sidesy-collapsed {
   overflow: hidden;
   /* 16px top offset mirrors the expanded sticky header (top: 16px), so the

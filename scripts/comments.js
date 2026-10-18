@@ -575,8 +575,8 @@ function activateExtension() {
 
   const existingHeader = commentsEl.querySelector(':scope > .comments-header');
   if (existingHeader) existingHeader.remove();
-  // Drop any stale collapsed placeholder from a previous navigation: its
-  // click listener closes over the old activation's setCommentsCollapsed.
+  // Drop any stale folded placeholder from a previous navigation: its
+  // click listener closes over the old activation's fold state.
   const staleNotice = commentsEl.querySelector(':scope > .sidesy-collapsed-notice');
   if (staleNotice) staleNotice.remove();
   commentsEl.classList.remove('sidesy-collapsed');
@@ -624,7 +624,7 @@ function activateExtension() {
   let isCommentsCollapsed = false;
   let collapseByDefault = false;
   // Scroll position within the sidebar (the "state" users mean when they say
-  // collapse/fullscreen loses their place). In-memory per video: each video
+  // fold/fullscreen loses their place). In-memory per video: each video
   // has a different comment set, so this is intentionally not persisted.
   let savedCollapsedScroll = null;
   // Fullscreen hide happens *before* `fullscreenchange` fires, so saving at
@@ -670,15 +670,15 @@ function activateExtension() {
   function updateExpandCommentsButton() {
     const inSidebar = isSidebarMode();
     expandCommentsButton.hidden = !inSidebar;
-    // When X-collapsed, park the Z button with visibility (not display) so
-    // the collapse + toggle buttons never shift position.
+    // When folded, park the full-height button with visibility (not display) so
+    // the fold + toggle buttons never shift position.
     const parked = inSidebar && isCommentsCollapsed;
     expandCommentsButton.classList.toggle('sidesy-btn-parked', parked);
     expandCommentsButton.setAttribute('aria-expanded', String(isSidebarExpanded));
 
     if (!inSidebar) return;
 
-    const label = isSidebarExpanded ? 'Collapse comments section' : 'Expand comments section';
+    const label = isSidebarExpanded ? 'Back to standard height' : 'Switch to full height';
     expandCommentsIcon.innerHTML = getExpandCommentsIconSvg();
     expandCommentsTooltip.textContent = '';
     const textNode = document.createElement('span');
@@ -712,7 +712,7 @@ function activateExtension() {
 
     if (!isVisible) return;
 
-    const label = isCommentsCollapsed ? 'Show comments' : 'Collapse comments';
+    const label = isCommentsCollapsed ? 'Unfold comments' : 'Fold comments away';
     collapseCommentsIcon.innerHTML = getCollapseCommentsIconSvg();
     collapseCommentsTooltip.textContent = '';
     const textNode = document.createElement('span');
@@ -722,8 +722,8 @@ function activateExtension() {
   }
 
   function getCollapseCommentsIconSvg() {
-    // Bar + chevron motif, rhyming with the expand button's double chevrons:
-    // top bar + down chevron = collapse away, bottom bar + up chevron = bring back.
+    // Bar + chevron motif, rhyming with the full-height button's double chevrons:
+    // top bar + down chevron = fold away, bottom bar + up chevron = unfold.
     const path = isCommentsCollapsed ? 'M4 19h16M7 12l5-5 5 5' : 'M4 5h16M7 12l5 5 5-5';
     return `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="sidesy-collapse-comments-svg ${
@@ -742,10 +742,10 @@ function activateExtension() {
       notice.hidden = true;
       const title = document.createElement('span');
       title.classList.add('sidesy-collapsed-notice-title');
-      title.textContent = 'Comments section collapsed';
+      title.textContent = 'Comments folded away';
       const hint = document.createElement('span');
       hint.classList.add('sidesy-collapsed-notice-hint');
-      hint.textContent = 'Click or press X to show comments';
+      hint.textContent = 'Click or press X to unfold comments';
       notice.append(title, hint);
       notice.addEventListener('click', () => setCommentsCollapsed(false));
       commentsEl.append(notice);
@@ -759,7 +759,7 @@ function activateExtension() {
 
   function setCommentsCollapsed(collapsed) {
     if (collapsed && !isSidebarMode()) return;
-    // Save scroll *before* mutating DOM: collapsing hides threads
+    // Save scroll *before* mutating DOM: folding hides threads
     // (display:none via CSS) and resets scrollTop to 0 for the slim bar.
     if (collapsed && !isCommentsCollapsed) {
       savedCollapsedScroll = saveSidebarScroll();
@@ -767,7 +767,7 @@ function activateExtension() {
     isCommentsCollapsed = collapsed;
     const notice = ensureCollapsedNotice();
     // Dedicated smooth curves (no bounce) — the large height change of the
-    // radical collapse makes Z's springy curve look wrong.
+    // radical fold makes the full-height springy curve look wrong.
     setCollapseHeightAnimation(collapsed);
     if (collapsed) {
       commentsEl.classList.add('sidesy-collapsed');
@@ -778,8 +778,8 @@ function activateExtension() {
       commentsEl.classList.remove('sidesy-collapsed');
       notice.hidden = true;
       syncSidebarHeight();
-      // Restore the pre-collapse position (immediate + next-frame pass for
-      // the height animation). Consume it so a later expand starts fresh.
+      // Restore the pre-fold position (immediate + next-frame pass for
+      // the height animation). Consume it so a later full-height change starts fresh.
       const toRestore = savedCollapsedScroll;
       savedCollapsedScroll = null;
       if (toRestore) restoreSidebarScroll(toRestore);
@@ -796,7 +796,7 @@ function activateExtension() {
       // Re-assert (not just update buttons): fullscreen enter/exit and
       // YouTube DOM shuffling can clear the inline height/class while the
       // in-memory flag is still true. Repair it here so resize/fullscreen
-      // always converges back to the saved collapsed bar.
+      // always converges back to the saved folded bar.
       commentsEl.classList.add('sidesy-collapsed');
       commentsEl.style.height = `${SIDESY_COLLAPSED_HEIGHT}px`;
       const collapsedNotice = commentsEl.querySelector(':scope > .sidesy-collapsed-notice');
@@ -972,7 +972,7 @@ function activateExtension() {
 
   function saveSidebarScroll() {
     if (!isSidebarMode()) return null;
-    // Must be called while threads are still visible (before collapse class
+    // Must be called while threads are still visible (before fold class
     // or fullscreen hides the sidebar) so anchor detection can see them.
     return {
       anchor: captureTopCommentAnchor(),
@@ -1011,7 +1011,7 @@ function activateExtension() {
   }
 
   function onSidebarScroll() {
-    // Never record hidden/clobbered state: while collapsed, fullscreen, or
+    // Never record hidden/clobbered state: while folded, fullscreen, or
     // detached, scrollTop may read 0 — keeping the last visible value.
     if (!isSidebarVisibleForTracking()) return;
     const scrollTop = commentsEl.scrollTop;
@@ -1223,14 +1223,14 @@ function activateExtension() {
     isSidebarExpanded = data.sidebar_comments_expanded === true;
     collapseByDefault = data[COLLAPSE_DEFAULT_STORAGE_KEY] === true;
     const savedCollapsed = data[COLLAPSED_STATE_STORAGE_KEY];
-    // Prefer the last explicit X state when it exists; otherwise fall back
-    // to the "collapse by default" preference. Previously the saved X value
+    // Prefer the last explicit fold state when it exists; otherwise fall back
+    // to the "fold by default" preference. Previously the saved fold value
     // was written but never read, so every navigation/reload reset to the
     // default preference. This also fixes fullscreen-triggered
     // re-activations, which rebuild from the same init path.
     const startCollapsed = typeof savedCollapsed === 'boolean' ? savedCollapsed : collapseByDefault;
-    // Collapse only applies visually in the sidebar; keep the flag even in
-    // default placement so toggling back to sidebar restores the X state.
+    // Fold only applies visually in the sidebar; keep the flag even in
+    // default placement so toggling back to sidebar restores the fold state.
     isCommentsCollapsed = startCollapsed;
 
     if (data.comments_placement === 'default') {

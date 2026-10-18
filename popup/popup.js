@@ -86,16 +86,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // "Collapse comments by default" preference — read by the content script on
-  // each new video to decide whether the sidebar starts collapsed.
+  // "Fold comments by default" preference — read by the content script on
+  // each new video to decide whether the sidebar starts folded.
   if (collapseToggle) {
     ext.storage.local.get([COLLAPSE_DEFAULT_KEY]).then((data) => {
       collapseToggle.checked = data[COLLAPSE_DEFAULT_KEY] === true;
     }).catch(() => {});
 
     collapseToggle.addEventListener("change", () => {
-      // Keep the last explicit X state in sync when the default changes,
-      // otherwise a stale saved X value would override the new default on
+      // Keep the last explicit fold state in sync when the default changes,
+      // otherwise a stale saved fold value would override the new default on
       // every new video.
       ext.storage.local.set({
         [COLLAPSE_DEFAULT_KEY]: collapseToggle.checked,

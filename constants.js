@@ -38,7 +38,8 @@ globalThis.CONSTANTS = globalThis.CONSTANTS || {
   ],
   ANNOUNCEMENT: {
     items: [
-      "Expandable sidebar comments\nYou can now expand comments to full height from the new header button, or by pressing Z when comments are on the side. The extra height fits more comments at once, especially on smaller screens. Thanks to everyone who asked for this!",
+      "Full-height sidebar\nSwitch comments to full height from the new header button, or by pressing Z when comments are on the side. Press again to go back to standard height. Handy on smaller screens — thanks to everyone who asked for this!",
+      "Fold comments away\nPress X or the new header button to fold comments into a slim bar, then click the bar (or press X again) to unfold. Prefer it folded? Turn on Fold comments by default in Settings — it applies to new videos.",
     ],
   },
   DEVELOPER_MESSAGE: {
