@@ -575,6 +575,34 @@ function activateExtension() {
     return commentsEl.classList.contains('popout');
   }
 
+  function syncSidebarPosition() {
+    if (!isSidebarMode()) return;
+
+    // YouTube's engagement panels (including Ask) take priority over comments.
+    // Keep their container above comments even when it is initially empty/hidden,
+    // so opening a panel does not depend on which feature initialized first.
+    const panelContainers = Array.from(sidebar.children).filter((child) => (
+      child !== commentsEl && (
+        child.id === 'panels' ||
+        child.matches('ytd-engagement-panel-section-list-renderer') ||
+        child.querySelector('ytd-engagement-panel-section-list-renderer')
+      )
+    ));
+    const lastPanelContainer = panelContainers.at(-1);
+    const nextSibling = lastPanelContainer
+      ? lastPanelContainer.nextSibling
+      : sidebar.firstChild;
+
+    // Avoid generating another mutation when comments are already in place.
+    if (nextSibling !== commentsEl) {
+      sidebar.insertBefore(commentsEl, nextSibling);
+    }
+    syncSidebarHeightWithNextFrame();
+  }
+
+  const sidebarObserver = new MutationObserver(syncSidebarPosition);
+  sidebarObserver.observe(sidebar, { childList: true });
+
   function getYouTubeHeaderBottom() {
     const header = document.querySelector('#masthead-container');
     if (!header) return 0;
@@ -797,8 +825,7 @@ function activateExtension() {
       <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 9l-3 3m0 0l3 3m-3-3h7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>`;
 
-    sidebar.prepend(commentsEl);
-    syncSidebarHeightWithNextFrame();
+    syncSidebarPosition();
 
     savePosition('sidebar');
   }
@@ -865,6 +892,7 @@ function activateExtension() {
   document.addEventListener('keydown', handleExpandCommentsKeydown);
   window.addEventListener('resize', syncSidebarHeight);
   activeExtensionCleanup = () => {
+    sidebarObserver.disconnect();
     if (sidebarHeightAnimationTimeout) {
       clearTimeout(sidebarHeightAnimationTimeout);
       sidebarHeightAnimationTimeout = null;
