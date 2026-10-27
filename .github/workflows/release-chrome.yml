@@ -67,6 +67,13 @@ jobs:
             -x ".github/*" \
             -x ".claude/*" \
             -x "dev-tools/*" \
+            -x "node_modules/*" \
+            -x "tests/*" \
+            -x "test-results/*" \
+            -x "playwright-report/*" \
+            -x "package.json" \
+            -x "package-lock.json" \
+            -x "playwright.config.js" \
             -x "images/1.png" \
             -x "images/2.png" \
             -x "images/3.png" \
