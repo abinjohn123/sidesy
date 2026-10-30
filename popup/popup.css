@@ -72,6 +72,92 @@ body {
   border-radius: 4px;
 }
 
+/* ── Settings ── */
+
+.popup-settings {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.popup-setting {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+}
+
+.popup-setting .link-text {
+  flex: 1;
+}
+
+.popup-switch {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+}
+
+.popup-switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.switch-track {
+  pointer-events: none;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--text-muted);
+  transition: background 0.15s ease;
+}
+
+.switch-track::before {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  transition: transform 0.15s ease;
+}
+
+.popup-setting input:checked + .switch-track {
+  background: var(--text);
+}
+
+.popup-setting input:checked + .switch-track::before {
+  transform: translateX(14px);
+}
+
+.popup-setting input:focus-visible + .switch-track {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+.popup-setting input:disabled + .switch-track {
+  opacity: 0.5;
+}
+
+.setting-error {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-track,
+  .switch-track::before {
+    transition: none;
+  }
+}
+
 /* ── Menu ── */
 
 #popup-menu {

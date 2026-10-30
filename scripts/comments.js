@@ -569,6 +569,7 @@ function activateExtension() {
   expandCommentsButton.appendChild(expandCommentsTooltip);
 
   let isSidebarExpanded = false;
+  let autoScrollOnToggle = true;
   let sidebarHeightAnimationTimeout = null;
 
   function isSidebarMode() {
@@ -831,6 +832,25 @@ function activateExtension() {
   }
 
   function switchMode(targetMode, preserveAnchor = true) {
+    if (targetMode === 'default' && !autoScrollOnToggle) {
+      const { scrollX, scrollY } = window;
+      const overflowAnchor = page.style.getPropertyValue('overflow-anchor');
+      const overflowAnchorPriority = page.style.getPropertyPriority('overflow-anchor');
+      // Moving the focused comments can also trigger browser scroll anchoring.
+      page.style.setProperty('overflow-anchor', 'none');
+      defaultView();
+      window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
+      requestAnimationFrame(() => {
+        window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
+        if (overflowAnchor) {
+          page.style.setProperty('overflow-anchor', overflowAnchor, overflowAnchorPriority);
+        } else {
+          page.style.removeProperty('overflow-anchor');
+        }
+      });
+      return;
+    }
+
     const anchor = preserveAnchor ? captureTopCommentAnchor() : null;
 
     if (targetMode === 'sidebar') sidebarView();
@@ -891,7 +911,14 @@ function activateExtension() {
   expandCommentsButton.addEventListener('click', handleExpandCommentsClick);
   document.addEventListener('keydown', handleExpandCommentsKeydown);
   window.addEventListener('resize', syncSidebarHeight);
+  function handleStorageChange(changes, areaName) {
+    if (areaName === 'local' && changes.auto_scroll_on_toggle) {
+      autoScrollOnToggle = changes.auto_scroll_on_toggle.newValue !== false;
+    }
+  }
+  chrome.storage.onChanged.addListener(handleStorageChange);
   activeExtensionCleanup = () => {
+    chrome.storage.onChanged.removeListener(handleStorageChange);
     sidebarObserver.disconnect();
     if (sidebarHeightAnimationTimeout) {
       clearTimeout(sidebarHeightAnimationTimeout);
@@ -901,8 +928,9 @@ function activateExtension() {
     window.removeEventListener('resize', syncSidebarHeight);
   };
 
-  chrome.storage.local.get(['comments_placement', 'sidebar_comments_expanded']).then((data) => {
+  chrome.storage.local.get(['comments_placement', 'sidebar_comments_expanded', 'auto_scroll_on_toggle']).then((data) => {
     isSidebarExpanded = data.sidebar_comments_expanded === true;
+    autoScrollOnToggle = data.auto_scroll_on_toggle !== false;
 
     if (data.comments_placement === 'default') defaultView();
     else sidebarView();
