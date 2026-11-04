@@ -1,9 +1,36 @@
 document.addEventListener("DOMContentLoaded", () => {
   const menu = document.getElementById("popup-menu");
+  const autoScrollSwitch = document.getElementById("auto-scroll-comments");
+  const settingError = document.getElementById("setting-error");
+
+  chrome.storage.local.get(["auto_scroll_on_toggle"])
+    .then((data) => {
+      autoScrollSwitch.checked = data.auto_scroll_on_toggle !== false;
+      autoScrollSwitch.disabled = false;
+    })
+    .catch(() => {
+      settingError.textContent = "Couldn't load this setting. Reopen the popup to try again.";
+      settingError.hidden = false;
+    });
+
+  autoScrollSwitch.addEventListener("change", async () => {
+    const enabled = autoScrollSwitch.checked;
+    autoScrollSwitch.disabled = true;
+    settingError.hidden = true;
+    try {
+      await chrome.storage.local.set({ auto_scroll_on_toggle: enabled });
+    } catch {
+      autoScrollSwitch.checked = !enabled;
+      settingError.textContent = "Couldn't save this setting. Please try again.";
+      settingError.hidden = false;
+    } finally {
+      autoScrollSwitch.disabled = false;
+    }
+  });
 
   CONSTANTS.POPUP_LINKS.forEach(({ label, description, icon, hoverColor, url, sectionLabel }) => {
     if (sectionLabel) {
-      const section = document.createElement("span");
+      const section = document.createElement("h2");
       section.className = "popup-section-label";
       section.textContent = sectionLabel;
       menu.appendChild(section);
