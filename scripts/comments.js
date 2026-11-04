@@ -31,7 +31,6 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
-const WATCH_PAGE_PATTERN = 'youtube.com/watch';
 const ANNOUNCEMENT_TOAST_ID = 'sidesy-announcement';
 const DEVELOPER_MESSAGE_TOAST_ID = 'sidesy-developer-message';
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -124,8 +123,8 @@ async function getToggleShortcutInfo() {
   }
 }
 
-function isWatchPageUrl() {
-  return location.href.includes(WATCH_PAGE_PATTERN);
+function isVideoPageUrl() {
+  return location.pathname === '/watch' || /^\/live\/[^/]+\/?$/.test(location.pathname);
 }
 
 function isEditableTarget(target) {
@@ -234,11 +233,11 @@ function startPeriodicCheck() {
 }
 
 function onNavigate() {
-  const isWatchPage = isWatchPageUrl();
+  const isVideoPage = isVideoPageUrl();
 
   cleanup();
 
-  if (!isWatchPage) {
+  if (!isVideoPage) {
     removeAnnouncementToast();
     removeDeveloperMessageToast();
     return;
@@ -253,12 +252,12 @@ document.addEventListener('yt-navigate-finish', onNavigate);
 // Also handle the initial page load (e.g. direct URL paste or refresh)
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    if (isWatchPageUrl()) {
+    if (isVideoPageUrl()) {
       cleanup();
       detectComments();
     }
   });
-} else if (isWatchPageUrl()) {
+} else if (isVideoPageUrl()) {
   detectComments();
 }
 
@@ -279,10 +278,10 @@ Shows a dismissable "What's New" banner inside the sidebar view
 if there is a pending announcement in storage.
 */
 function maybeShowAnnouncement(isDark) {
-  if (!isWatchPageUrl()) return;
+  if (!isVideoPageUrl()) return;
 
   chrome.storage.local.get(["pending_announcement"]).then((data) => {
-    if (!isWatchPageUrl()) return;
+    if (!isVideoPageUrl()) return;
 
     const version = data.pending_announcement;
     if (!version) return;
@@ -411,7 +410,7 @@ function dismissDeveloperMessage(toast, state, extraState = {}) {
 }
 
 function renderDeveloperMessage(isDark, config, state) {
-  if (!isWatchPageUrl()) return;
+  if (!isVideoPageUrl()) return;
   if (document.getElementById(DEVELOPER_MESSAGE_TOAST_ID)) return;
   if (document.getElementById(ANNOUNCEMENT_TOAST_ID)) return;
 
@@ -485,17 +484,17 @@ function renderDeveloperMessage(isDark, config, state) {
 
 function maybeShowDeveloperMessage(isDark) {
   const config = getDeveloperMessageConfig();
-  if (!config || !isWatchPageUrl()) return;
+  if (!config || !isVideoPageUrl()) return;
 
   window.setTimeout(() => {
-    if (!isWatchPageUrl()) return;
+    if (!isVideoPageUrl()) return;
 
     chrome.storage.local.get([
       'developer_message_state',
       'extension_installed_at',
       'pending_announcement',
     ]).then((data) => {
-      if (!isWatchPageUrl()) return;
+      if (!isVideoPageUrl()) return;
 
       const now = Date.now();
       const state = getDeveloperMessageState(config, data.developer_message_state, now);
