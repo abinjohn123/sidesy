@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   CONSTANTS.POPUP_LINKS.forEach(({ label, description, icon, hoverColor, url, sectionLabel }) => {
     if (sectionLabel) {
-      const section = document.createElement("span");
+      const section = document.createElement("h2");
       section.className = "popup-section-label";
       section.textContent = sectionLabel;
       menu.appendChild(section);

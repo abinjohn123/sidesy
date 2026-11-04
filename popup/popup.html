@@ -13,11 +13,12 @@
     </div>
     <span class="popup-version" id="popup-version"></span>
   </header>
-  <section class="popup-settings" aria-label="Settings">
+  <section class="popup-settings" aria-labelledby="preferences-heading">
+    <h2 class="popup-section-label" id="preferences-heading">Preferences</h2>
     <div class="popup-setting">
       <span class="link-text">
-        <span class="link-label" id="auto-scroll-label">Auto-scroll to comments</span>
-        <span class="link-description" id="auto-scroll-description">When moving comments below the video.</span>
+        <span class="link-label" id="auto-scroll-label">Autoscroll</span>
+        <span class="link-description" id="auto-scroll-description">When moving comments below video</span>
       </span>
       <label class="popup-switch">
         <input type="checkbox" role="switch" id="auto-scroll-comments" aria-labelledby="auto-scroll-label" aria-describedby="auto-scroll-description" checked disabled>
@@ -26,7 +27,7 @@
     </div>
     <p class="setting-error" id="setting-error" role="status" hidden></p>
   </section>
-  <nav id="popup-menu"></nav>
+  <nav id="popup-menu" aria-label="Support and more from me"></nav>
   <footer class="popup-footer">
     made with &hearts; by <a href="https://x.com/abin_john98" target="_blank" rel="noopener noreferrer">Abin John</a>
   </footer>

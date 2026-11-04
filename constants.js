@@ -2,18 +2,12 @@ const CONSTANTS = {
   WELCOME_PAGE_URL: "https://abinjohn123.github.io/sidesy-landing/",
   POPUP_LINKS: [
     {
-      label: "See Sidesy in action",
-      description: "A quick, 20-second walkthrough",
-      icon: "popup/icons/walkthrough.svg",
-      hoverColor: "#4285f4",
-      url: "https://abinjohn123.github.io/sidesy-landing/",
-    },
-    {
       label: "Having trouble? Reach out",
       description: "I'd love to help!",
       icon: "popup/icons/feedback.svg",
       hoverColor: "#e8453c",
       url: "mailto:builtbyabin@gmail.com?subject=Sidesy%20Feedback",
+      sectionLabel: "Support",
     },
     {
       label: "Enjoy using? Leave a review",
@@ -35,7 +29,7 @@ const CONSTANTS = {
       icon: "popup/icons/conduktor.svg",
       hoverColor: "#f85842",
       url: "https://chromewebstore.google.com/detail/conduktor-search-rename-g/ppemfnloahkomglmckngiioogeibdbdh",
-      sectionLabel: "Also from the developer",
+      sectionLabel: "Also by me",
     },
   ],
   ANNOUNCEMENT: {
