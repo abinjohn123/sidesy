@@ -34,7 +34,8 @@ const CONSTANTS = {
   ],
   ANNOUNCEMENT: {
     items: [
-      "Expandable sidebar comments\nYou can now expand comments to full height from the new header button, or by pressing Z when comments are on the side. The extra height fits more comments at once, especially on smaller screens. Thanks to everyone who asked for this!",
+      "Autoscroll control\nToggle autoscroll on or off when comments are moved below the video.",
+      "YouTube Live support\nSidesy now works with YouTube Live videos too.",
     ],
   },
   DEVELOPER_MESSAGE: {
